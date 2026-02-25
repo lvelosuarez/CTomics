@@ -17,7 +17,7 @@
 set -euo pipefail
 
 BIOPROJECT="PRJNA718445"
-KNEADDATA_DB="./kneaddata_db"     # adjust path to your bowtie2 human index
+KNEADDATA_DB="/mnt/san/microbio/database/kneaddata_db"     # adjust path to your bowtie2 human index
 THREADS=8
 OUTDIR="cho_kneaddata_results"
 FASTQ_DIR="cho_fastqs"
