@@ -1,10 +1,8 @@
-<p align="center">
+<p align="left">
   <img src="images/logo.svg" alt="CTomics logo" width="320"/>
 </p>
 
-# CTomics
-
-**Ct-Based Prediction of Host–Microbiome Library Composition Prior to Shotgun Sequencing**
+**CT-Based Prediction of Host–Microbiome Library Composition Prior to Shotgun Sequencing**
 
 ---
 
