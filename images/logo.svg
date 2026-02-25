@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 100" width="320" height="100">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#16213e;stop-opacity:1"/>
+    </linearGradient>
+    <linearGradient id="helixGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4cc9f0;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#4361ee;stop-opacity:1"/>
+    </linearGradient>
+    <linearGradient id="microbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f72585;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#7209b7;stop-opacity:1"/>
+    </linearGradient>
+    <linearGradient id="humanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4cc9f0;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#4361ee;stop-opacity:1"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="320" height="100" rx="10" fill="url(#bgGrad)"/>
+
+  <!-- ── Lung silhouette (subtle, background) ─────────────── -->
+  <!-- Left lobe -->
+  <path d="M 28 72 C 20 60, 18 42, 26 30 C 30 24, 38 22, 42 26
+            C 46 30, 46 36, 44 42 C 42 50, 40 58, 38 68 Z"
+        fill="#4361ee" opacity="0.15"/>
+  <!-- Right lobe -->
+  <path d="M 58 72 C 66 60, 68 42, 60 30 C 56 24, 48 22, 44 26
+            C 40 30, 40 36, 42 42 C 44 50, 46 58, 48 68 Z"
+        fill="#4361ee" opacity="0.15"/>
+  <!-- Trachea -->
+  <rect x="41" y="16" width="4" height="14" rx="2" fill="#4361ee" opacity="0.2"/>
+
+  <!-- ── DNA double helix (left icon area) ────────────────── -->
+  <!-- Strand 1: sine wave -->
+  <path d="M 22 20 C 26 26, 30 32, 34 38 C 38 44, 42 50, 46 56
+            C 50 62, 54 68, 58 74 C 62 80, 66 86, 70 80"
+        fill="none" stroke="url(#helixGrad)" stroke-width="2.2" stroke-linecap="round" opacity="0.9"/>
+  <!-- Strand 2: offset sine wave -->
+  <path d="M 22 80 C 26 74, 30 68, 34 62 C 38 56, 42 50, 46 44
+            C 50 38, 54 32, 58 26 C 62 20, 66 14, 70 20"
+        fill="none" stroke="url(#microbGrad)" stroke-width="2.2" stroke-linecap="round" opacity="0.9"/>
+  <!-- Cross-rungs -->
+  <line x1="24.5" y1="23" x2="24.5" y2="77" stroke="none"/>
+  <line x1="28"  y1="28" x2="28"  y2="72" stroke="#a0c4ff" stroke-width="1.2" opacity="0.5"/>
+  <line x1="34"  y1="38" x2="34"  y2="62" stroke="#a0c4ff" stroke-width="1.2" opacity="0.5"/>
+  <line x1="40"  y1="47" x2="40"  y2="53" stroke="#a0c4ff" stroke-width="1.2" opacity="0.5"/>
+  <line x1="46"  y1="44" x2="46"  y2="56" stroke="#a0c4ff" stroke-width="1.2" opacity="0.5"/>
+  <line x1="52"  y1="38" x2="52"  y2="62" stroke="#a0c4ff" stroke-width="1.2" opacity="0.5"/>
+  <line x1="58"  y1="28" x2="58"  y2="72" stroke="#a0c4ff" stroke-width="1.2" opacity="0.5"/>
+  <line x1="64"  y1="20" x2="64"  y2="80" stroke="#a0c4ff" stroke-width="1.2" opacity="0.5"/>
+
+  <!-- ── Microbe circle (right of helix) ──────────────────── -->
+  <circle cx="80" cy="50" r="11" fill="url(#microbGrad)" opacity="0.85"/>
+  <!-- Spikes -->
+  <line x1="80" y1="33" x2="80" y2="27" stroke="#f72585" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="80" y1="67" x2="80" y2="73" stroke="#f72585" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="63" y1="50" x2="57" y2="50" stroke="#f72585" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="97" y1="50" x2="103" y2="50" stroke="#f72585" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="68" y1="38" x2="64" y2="34" stroke="#f72585" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="92" y1="38" x2="96" y2="34" stroke="#f72585" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="68" y1="62" x2="64" y2="66" stroke="#f72585" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="92" y1="62" x2="96" y2="66" stroke="#f72585" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Inner detail -->
+  <circle cx="80" cy="50" r="5" fill="none" stroke="white" stroke-width="1" opacity="0.5"/>
+
+  <!-- ── Text: CTomics ─────────────────────────────────────── -->
+  <text x="115" y="58" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+        font-size="34" font-weight="700" letter-spacing="-1"
+        fill="white">CT<tspan fill="url(#microbGrad)">omics</tspan></text>
+
+  <!-- ── Tagline ───────────────────────────────────────────── -->
+  <text x="116" y="74" font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+        font-size="9.5" fill="#a0c4ff" letter-spacing="1.5" opacity="0.8">
+    qPCR · HOST DEPLETION · MICROBIOME
+  </text>
+
+  <!-- ── Thin accent line ──────────────────────────────────── -->
+  <line x1="115" y1="64" x2="305" y2="64" stroke="#4361ee" stroke-width="0.5" opacity="0.4"/>
+</svg>
