@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CTomics — Microbial Read Fraction Predictor</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+
+:root {
+  --bg: #ffffff;
+  --bg2: #fafafa;
+  --bg3: #f2f2f2;
+  --border: #d0d0d0;
+  --border2: #b0b0b0;
+  --text: #0a0a0a;
+  --text-dim: #444444;
+  --text-muted: #888888;
+  --accent: #000000;
+  --accent2: #222222;
+  --warn: #cc4400;
+  --danger: #cc0022;
+  --success: #006630;
+  --purple: #5500cc;
+  --yellow: #885500;
+  --grid: #ebebeb;
+}
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Arial', monospace;
+    font-size: 15px;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+
+
+  .header {
+    border-bottom: 1px solid var(--border);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg2);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .header-left { display: flex; align-items: baseline; gap: 16px; }
+
+  .logo svg {
+    height: 60px;
+    width: auto;
+    display: block;
+  }
+
+
+  .tag {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #ffffff;
+    background: var(--accent);
+    padding: 2px 8px;
+    font-weight: 600;
+  }
+
+  .header-right {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+    text-align: right;
+    line-height: 1.6;
+  }
+
+  .main {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    grid-template-rows: auto 1fr;
+    min-height: calc(100vh - 65px);
+  }
+
+  /* ---- LEFT PANEL ---- */
+  .panel-left {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    grid-row: 1 / 3;
+  }
+
+  .section {
+    border-bottom: 1px solid var(--border);
+    padding: 20px 24px;
+  }
+
+  .section-title {
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Model selector */
+  .model-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .model-btn {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 11px;
+    padding: 10px 14px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .model-btn:hover { border-color: var(--accent2); color: var(--text); }
+  .model-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.05); }
+  .model-btn .badge {
+    font-size: 8px;
+    padding: 1px 5px;
+    background: var(--border2);
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+  }
+  .model-btn.active .badge { background: rgba(0,212,255,0.15); color: var(--accent); }
+
+  /* Input area */
+  .input-mode { display: flex; gap: 4px; margin-bottom: 12px; }
+  .mode-btn {
+    flex: 1;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 10px;
+    padding: 7px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+  }
+  .mode-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.05); }
+
+  textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 12px;
+    resize: vertical;
+    min-height: 160px;
+    line-height: 1.6;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  textarea:focus { border-color: var(--accent2); }
+  textarea::placeholder { color: var(--text-muted); }
+
+  .hint { font-size: 10px; color: var(--text-dim); margin-top: 8px; line-height: 1.5; }
+  .hint code { color: var(--accent); background: rgba(0,212,255,0.08); padding: 1px 4px; }
+
+  .file-drop {
+    border: 1px dashed var(--border2);
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    background: var(--bg);
+  }
+  .file-drop:hover, .file-drop.dragover { border-color: var(--accent); background: rgba(0,212,255,0.03); }
+  .file-drop .drop-icon { font-size: 28px; margin-bottom: 8px; }
+  .file-drop p { font-size: 11px; color: var(--text-dim); line-height: 1.6; }
+  .file-drop input { display: none; }
+
+  /* Params */
+  .param-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .param-label { font-size: 10px; color: var(--text-dim); }
+  .param-input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: inherit;
+    font-size: 11px;
+    padding: 5px 10px;
+    width: 100px;
+    text-align: right;
+    outline: none;
+  }
+  .param-input:focus { border-color: var(--accent2); }
+
+  .run-btn {
+    width: 100%;
+    background: var(--accent);
+    border: none;
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 14px;
+    cursor: pointer;
+    margin-top: 16px;
+    transition: all 0.15s;
+  }
+  .run-btn:hover { background: var(--accent2); }
+  .run-btn:active { transform: scale(0.99); }
+
+  /* ---- RIGHT PANEL ---- */
+  .panel-right {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .viz-area {
+    padding: 24px 28px;
+    border-bottom: 1px solid var(--border);
+    flex: 0 0 auto;
+  }
+
+  .chart-title {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 220px;
+  }
+
+  /* Results table */
+  .results-area {
+    flex: 1;
+    overflow: auto;
+    padding: 0;
+  }
+
+  .results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .results-title { font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-dim); }
+
+  .stats-row {
+    display: flex;
+    gap: 24px;
+  }
+
+  .stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .stat-val { font-size: 16px; font-weight: 600; color: var(--accent); }
+  .stat-label { font-size: 9px; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+
+  thead th {
+    padding: 10px 16px;
+    text-align: left;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    background: var(--bg);
+    position: sticky;
+    top: 48px;
+  }
+
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  tbody tr:hover { background: rgba(0,212,255,0.03); }
+
+  td {
+    padding: 9px 16px;
+    white-space: nowrap;
+  }
+
+  td.id-col { color: var(--text-dim); font-size: 10px; }
+  td.delta-col { color: var(--yellow); font-weight: 500; }
+  td.pred-col { font-weight: 600; }
+  td.ci-col { color: var(--text-dim); font-size: 10px; }
+
+  .warn-chip {
+    display: inline-block;
+    font-size: 8px;
+    padding: 1px 5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-left: 6px;
+    font-weight: 600;
+  }
+
+  .bar-cell { min-width: 120px; }
+  .bar-wrap { background: var(--bg3); height: 6px; width: 100%; position: relative; }
+  .bar-fill {
+    height: 100%;
+    transition: width 0.4s ease;
+    position: absolute;
+    left: 0;
+    top: 0;
+  }
+
+  .depth-col { font-family: 'IBM Plex Sans', sans-serif; font-size: 11px; }
+  .regime-col { font-size: 9px; letter-spacing: 0.1em; }
+
+  .empty-state {
+    padding: 60px 28px;
+    text-align: center;
+    color: var(--text-dim);
+  }
+  .empty-state .big { font-size: 40px; margin-bottom: 12px; opacity: 0.3; }
+  .empty-state p { font-size: 12px; line-height: 1.7; }
+
+  .export-btn {
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 10px;
+    padding: 5px 12px;
+    cursor: pointer;
+    letter-spacing: 0.08em;
+    transition: all 0.15s;
+  }
+  .export-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .formula-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent2);
+    padding: 10px 14px;
+    font-size: 10px;
+    color: var(--text-dim);
+    line-height: 1.7;
+    margin-bottom: 14px;
+  }
+  .formula-box code { color: var(--accent); }
+
+  .legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-dim); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .legend-line { width: 20px; height: 2px; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .fade-in { animation: fadeIn 0.3s ease forwards; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-left">
+    <div class="logo"> 
+        <?xml version="1.0" encoding="UTF-8"?>
+      <svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 681 299">
+  <!-- Generator: Adobe Illustrator 29.8.4, SVG Export Plug-In . SVG Version: 2.1.1 Build 6)  -->
+  <defs>
+    <style>
+      .st0 {
+        stroke: #5b4b8a;
+      }
+
+      .st0, .st1, .st2, .st3, .st4 {
+        fill: none;
+        stroke-linecap: round;
+        stroke-width: 4px;
+      }
+
+      .st5 {
+        fill: #414042;
+      }
+
+      .st1 {
+        stroke: #f15b4c;
+      }
+
+      .st2 {
+        stroke: #4c9b3a;
+      }
+
+      .st3 {
+        stroke: #f3c623;
+      }
+
+      .st4 {
+        stroke: #1f70b8;
+      }
+    </style>
+  </defs>
+  <path class="st0" d="M232,178.1c18.3,0,36.6-5.4,50.4-16.3,22.9-21.7,32.1-54.3,41.2-76,13.7-32.6,36.6-51.6,73.3-59.7,27.5-5.4,55-8.1,91.6-8.1"/>
+  <path class="st4" d="M268.6,178.1c18.3,0,36.6-5.4,50.4-16.3,22.9-21.7,32.1-54.3,41.2-76,13.7-32.6,36.6-51.6,73.3-59.7,27.5-5.4,55-8.1,91.6-8.1"/>
+  <path class="st2" d="M305.3,178.1c18.3,0,36.6-5.4,50.4-16.3,22.9-21.7,32.1-54.3,41.2-76,13.7-32.6,36.6-51.6,73.3-59.7,27.5-5.4,55-8.1,91.6-8.1"/>
+  <path class="st3" d="M341.9,178.1c18.3,0,36.6-5.4,50.4-16.3,22.9-21.7,32.1-54.3,41.2-76,13.7-32.6,36.6-51.6,73.3-59.7,27.5-5.4,55-8.1,91.6-8.1"/>
+  <path class="st1" d="M378.6,178.1c18.3,0,36.6-5.4,50.4-16.3,22.9-21.7,32.1-54.3,41.2-76,13.7-32.6,36.6-51.6,73.3-59.7,27.5-5.4,55-8.1,91.6-8.1"/>
+  <path class="st5" d="M123.4,243.8c-1.9,2.9-4.2,5.6-6.9,8.1s-5.9,4.8-9.4,6.8c-3.6,1.9-7.5,3.5-11.8,4.6-4.3,1.1-9,1.7-14.1,1.7-8.5,0-16.4-1.5-23.6-4.5-7.2-3-13.5-7.1-18.7-12.4-5.2-5.3-9.3-11.5-12.2-18.8-2.9-7.2-4.4-15.2-4.4-23.8s1.5-16.5,4.5-23.8c3-7.2,7.1-13.5,12.4-18.8s11.5-9.4,18.7-12.4c7.2-3,15-4.5,23.4-4.5s8.2.4,12.2,1.3c4,.9,7.7,2.1,11.3,3.6,3.5,1.6,6.7,3.5,9.6,5.6,2.9,2.2,5.3,4.7,7.2,7.4l-9.6,7c-1.2-1.8-2.7-3.6-4.7-5.4-2-1.8-4.3-3.4-6.9-4.8-2.7-1.4-5.6-2.5-8.7-3.4-3.1-.9-6.5-1.3-10.1-1.3-7.3,0-13.9,1.3-19.7,4-5.8,2.7-10.7,6.2-14.8,10.7-4,4.5-7.1,9.7-9.3,15.7-2.1,5.9-3.2,12.2-3.2,18.8s1.1,12.8,3.3,18.8c2.2,5.9,5.3,11.2,9.3,15.7,4,4.5,9,8.1,14.8,10.7,5.8,2.7,12.3,4,19.6,4s12.7-1.3,18.5-4c5.9-2.7,10.7-6.9,14.7-12.8l8.9,5.7Z"/>
+  <path class="st5" d="M178.4,262.1h-11.5v-102.8h-37.8v-10.2h87.2v10.2h-37.8v102.8Z"/>
+  <path class="st5" d="M301.7,222.8c0,5.6-1,10.9-3,15.6-2,4.8-4.7,8.9-8.2,12.5s-7.7,6.3-12.6,8.2c-4.9,2-10.3,3-16.1,3s-11.1-1-16-3c-4.9-2-9.1-4.7-12.6-8.2-3.5-3.5-6.3-7.7-8.2-12.5-2-4.8-3-10-3-15.6s1-10.9,3-15.6c2-4.8,4.7-8.9,8.2-12.5,3.5-3.5,7.7-6.3,12.6-8.2,4.9-2,10.2-3,16-3s11.2,1,16.1,3c4.9,2,9.1,4.7,12.6,8.2s6.3,7.7,8.2,12.5c2,4.8,3,10,3,15.6ZM290.2,222.8c0-4.2-.7-8.1-2-11.7-1.3-3.7-3.2-6.9-5.7-9.6-2.4-2.7-5.4-4.9-8.9-6.5s-7.5-2.4-11.8-2.4-8.3.8-11.7,2.4c-3.5,1.6-6.4,3.8-8.9,6.5-2.4,2.7-4.3,5.9-5.7,9.6-1.3,3.7-2,7.6-2,11.7s.7,8.1,2,11.7c1.3,3.7,3.2,6.9,5.7,9.6,2.4,2.7,5.4,4.8,8.9,6.4,3.5,1.5,7.4,2.3,11.7,2.3s8.3-.8,11.8-2.3c3.5-1.5,6.5-3.7,8.9-6.4,2.4-2.7,4.3-5.9,5.7-9.6,1.3-3.7,2-7.6,2-11.7Z"/>
+  <path class="st5" d="M345.5,187.6c4.4-2.7,9.3-4.1,14.8-4.1s4.1.2,6.3.6c2.2.4,4.3,1.3,6.4,2.5,2.1,1.2,4,2.8,5.7,4.9,1.8,2,3.3,4.6,4.6,7.8,2.6-5.1,6-9,10.5-11.7,4.4-2.7,9.7-4.1,15.7-4.1,9.5,0,16.6,2.8,21.3,8.5,4.7,5.6,7.1,13.1,7.1,22.4v45.8h-10.9v-41.3c0-7.9-1.5-14.2-4.4-19-2.9-4.8-7.9-7.2-14.9-7.2s-7.3.8-10,2.4-4.9,3.7-6.5,6.3c-1.7,2.6-2.8,5.6-3.6,8.9-.7,3.3-1.1,6.7-1.1,10.2v39.8h-10.9v-43.6c0-3.6-.3-6.9-.8-9.9-.5-3-1.5-5.5-2.8-7.6-1.3-2.1-3.2-3.7-5.5-4.8-2.3-1.1-5.3-1.7-8.9-1.7s-5.1.6-7.7,1.8c-2.6,1.2-4.9,3-7,5.3-2.1,2.4-3.8,5.4-5,9.1s-1.9,8-1.9,13v38.3h-10.9v-58.3c0-2,0-4.6-.2-7.8-.1-3.2-.3-6.1-.5-8.6h10.4c.2,2,.4,4.3.5,6.7.1,2.5.2,4.5.2,6.1h.3c2.1-4.4,5.4-7.9,9.8-10.6Z"/>
+  <path class="st5" d="M479.2,156.7c0,2.2-.8,4.1-2.4,5.5-1.6,1.4-3.4,2.2-5.3,2.2s-3.7-.7-5.3-2.2c-1.6-1.4-2.4-3.3-2.4-5.5s.8-4.1,2.4-5.5c1.6-1.4,3.4-2.2,5.3-2.2s3.7.7,5.3,2.2,2.4,3.3,2.4,5.5ZM477,260.2h-10.9v-74.7h10.9v74.7Z"/>
+  <path class="st5" d="M559.7,202.6c-1.8-2.9-4.4-5.2-7.9-7.1-3.5-1.9-7.2-2.8-11.3-2.8s-8.3.8-11.8,2.3c-3.5,1.5-6.5,3.7-9,6.4-2.5,2.7-4.4,5.9-5.7,9.6-1.3,3.7-2,7.6-2,11.9s.7,8.2,2,11.8c1.3,3.6,3.2,6.8,5.7,9.5,2.4,2.7,5.4,4.8,8.9,6.4,3.5,1.5,7.4,2.3,11.8,2.3s8.8-.9,12.1-2.7c3.3-1.8,6-4.2,8.1-7l8.1,6.1c-3.2,3.9-7.1,7.1-11.7,9.4s-10.2,3.5-16.7,3.5-11.5-1-16.4-3c-4.9-2-9.1-4.7-12.5-8.2-3.5-3.5-6.1-7.7-8.1-12.5-1.9-4.8-2.9-10-2.9-15.6s1-10.9,2.9-15.6c1.9-4.8,4.6-8.9,8.1-12.5,3.5-3.5,7.6-6.3,12.5-8.2,4.9-2,10.4-3,16.4-3s10.1,1.1,15.2,3.3c5.2,2.2,9.3,5.4,12.5,9.7l-8.5,6.1Z"/>
+  <path class="st5" d="M625.5,203.2c-1.6-3.1-4-5.6-7.3-7.6-3.2-2-6.9-3-11.1-3s-3.8.2-5.7.6c-1.9.4-3.6,1.1-5.1,2.1-1.5,1-2.7,2.2-3.6,3.7-.9,1.5-1.4,3.2-1.4,5.3,0,3.5,1.4,6.2,4.3,8.1,2.9,1.9,7.4,3.4,13.6,4.7,8.8,1.8,15.4,4.4,19.6,7.9,4.2,3.5,6.3,8.1,6.3,14s-.8,7.9-2.5,10.8c-1.7,2.9-3.8,5.3-6.5,7.2-2.7,1.9-5.7,3.2-9,4-3.4.8-6.7,1.2-10.1,1.2-5.6,0-11.1-1.2-16.4-3.5-5.3-2.3-9.7-6-13.1-11l8.6-6.4c1.9,3.3,4.7,6.1,8.5,8.3,3.7,2.2,7.8,3.4,12.3,3.4s4.6-.2,6.7-.6c2.1-.4,4-1.2,5.6-2.2,1.6-1.1,2.9-2.4,3.8-4.1,1-1.6,1.4-3.7,1.4-6.1,0-3.9-1.9-6.9-5.7-8.9-3.8-2-9.2-3.8-16.4-5.5-2.2-.5-4.6-1.2-7.1-2-2.5-.8-4.8-2-6.9-3.5-2.1-1.5-3.9-3.5-5.3-5.8-1.4-2.3-2.1-5.3-2.1-8.8s.7-7.1,2.2-9.8c1.5-2.7,3.5-4.9,6-6.7,2.5-1.8,5.3-3.1,8.5-3.9,3.2-.9,6.5-1.3,9.9-1.3,5.2,0,10.3,1.2,15.2,3.5,4.9,2.3,8.6,5.6,11,9.9l-8.3,6.2Z"/>
+</svg>
+    </div>
+    <span style="font-size:15px;color:var(--text-dim)">Microbial Read Fraction Predictor</span>
+  </div>
+  <div class="header-right">
+    Cho et al. 2021 · mSystems 6:e00552-21<br>
+    Extended for low-ΔCt / BAL regime
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- LEFT PANEL -->
+  <aside class="panel-left">
+
+    <div class="section">
+      <div class="section-title">Prediction Model</div>
+      <div class="model-grid">
+        <button class="model-btn active" data-model="cho" onclick="selectModel(this)">
+          <span>Cho Model E <span style="color:var(--text-muted);font-size:9px">(sigmoid)</span></span>
+          <span class="badge">R²=0.990</span>
+        </button>
+        <button class="model-btn" data-model="linear" onclick="selectModel(this)">
+          <span>Linear (logit-transformed)</span>
+          <span class="badge">MODELS C/D</span>
+        </button>
+        <button class="model-btn" data-model="ensemble" onclick="selectModel(this)">
+          <span>Ensemble + CI</span>
+          <span class="badge">EXPERIMENTAL</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Input Data</div>
+      <div class="input-mode">
+        <button class="mode-btn active" onclick="switchMode('manual', this)">Manual</button>
+        <button class="mode-btn" onclick="switchMode('csv', this)">CSV / Paste</button>
+        <button class="mode-btn" onclick="switchMode('file', this)">Upload</button>
+      </div>
+
+      <!-- Manual -->
+      <div id="mode-manual">
+        <textarea id="manual-input" placeholder="One sample per line:
+sample_id   delta_ct
+AH-PS-001   7.73
+S01         20.18
+BAL-042     1.20
+…
+
+or just ΔCt values, one per line"></textarea>
+        <div class="hint">
+          Format: <code>id  ΔCt</code> or raw <code>ΔCt</code> values.<br>
+          ΔCt = Ct_ACTB − Ct_16S
+        </div>
+      </div>
+
+      <!-- CSV paste -->
+      <div id="mode-csv" style="display:none">
+        <textarea id="csv-input" placeholder="Paste CSV here:
+sample_id,ct_actb,ct_16s
+AH-PS-001,24.881,17.150
+HSV-11,29.487,15.288
+…
+
+Columns: sample_id, ct_actb, ct_16s
+or: sample_id, delta_ct"></textarea>
+        <div class="hint">Required columns: <code>ct_actb</code> + <code>ct_16s</code>, or <code>delta_ct</code> directly.</div>
+      </div>
+
+      <!-- File upload -->
+      <div id="mode-file" style="display:none">
+        <div class="file-drop" id="drop-zone">
+          <input type="file" id="file-input" accept=".csv,.tsv,.txt">
+          <div class="drop-icon">⬆</div>
+          <p>Drop CSV / TSV here<br>or click to browse</p>
+        </div>
+        <div class="hint" id="file-hint" style="margin-top:8px"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Sequencing Parameters</div>
+      <div class="param-row">
+        <span class="param-label">Target microbial reads (M)</span>
+        <input class="param-input" id="target-reads" type="number" value="50" min="1" max="1000">
+      </div>
+      <div class="param-row">
+        <span class="param-label">Total sequencing depth (M)</span>
+        <input class="param-input" id="total-depth" type="number" value="150" min="10" max="5000">
+      </div>
+      <div class="param-row">
+        <span class="param-label">Bootstrap CI samples</span>
+        <input class="param-input" id="n-boot" type="number" value="500" min="100" max="5000">
+      </div>
+      <button class="run-btn" onclick="runPredictions()">▶ Run Predictions</button>
+    </div>
+
+    <div class="section" style="flex:1;border-bottom:none">
+      <div class="section-title">Model Formula</div>
+      <div class="formula-box">
+        <code>% microbial =</code><br>
+        <code>&nbsp; 2.7201549 /</code><br>
+        <code>&nbsp; (99.50267 × e^(−0.7218 × ΔCt) + 0.02733)</code><br><br>
+        <span style="color:var(--text-muted)">Lower asymptote: ~0.027%<br>
+        Valid range: 4% – 98% microbial</span>
+      </div>
+      <div class="hint">
+        Samples with predicted % &lt; 4% or &gt; 98% fall outside the model's validated range.
+        CTomics flags these for review.
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- RIGHT PANEL -->
+  <div class="panel-right">
+
+    <!-- Chart -->
+    <div class="viz-area">
+      <div class="chart-title">
+        Sigmoidal Model Curve — Sample Positions
+        <span style="flex:1"></span>
+        <span style="font-size:9px;color:var(--text-muted)">hover for details</span>
+      </div>
+      <canvas id="chart"></canvas>
+      <div class="legend" id="legend">
+        <div class="legend-item"><div class="legend-line" style="background:var(--accent)"></div> Cho Model E</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--warn)"></div> 4% lower threshold</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--danger)"></div> &lt;4% (low-ΔCt regime)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--success)"></div> 4–98% (valid range)</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div> &gt;98% (upper limit)</div>
+      </div>
+    </div>
+
+    <!-- Results table -->
+    <div class="results-area" id="results-area">
+      <div class="empty-state" id="empty-state">
+        <div class="big">⬡</div>
+        <p>Enter ΔCt values in the left panel<br>and click <strong>Run Predictions</strong></p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ============================================================
+// MODELS
+// ============================================================
+const choModel = delta => {
+  const v = 2.7201549 / (99.50267 * Math.exp(-0.7218 * delta) + 0.02733);
+  return Math.min(100, Math.max(0, v));
+};
+
+// Logit-linear approximation (Models C/D from Cho)
+// Derived from logit-transformed fit: logit(p) ≈ 0.74*delta - 3.9
+const logitLinearModel = delta => {
+  const logit = 0.74 * delta - 3.9;
+  const p = 1 / (1 + Math.exp(-logit));
+  return Math.min(100, Math.max(0, p * 100));
+};
+
+// Bootstrap CI around Cho model (using residual variance from paper ~4.35% SD on training)
+const bootstrapCI = (delta, nBoot, modelFn) => {
+  const residualSD = delta < 5 ? 8.5 : 4.35; // higher uncertainty in low-ΔCt
+  const preds = [];
+  for (let i = 0; i < nBoot; i++) {
+    const noise = sampleNormal(0, residualSD);
+    preds.push(Math.min(100, Math.max(0, modelFn(delta) + noise)));
+  }
+  preds.sort((a, b) => a - b);
+  return {
+    lo: preds[Math.floor(nBoot * 0.025)],
+    hi: preds[Math.floor(nBoot * 0.975)],
+    mean: preds.reduce((a, b) => a + b, 0) / nBoot,
+  };
+};
+
+const sampleNormal = (mu, sigma) => {
+  let u = 0, v = 0;
+  while (!u) u = Math.random();
+  while (!v) v = Math.random();
+  return mu + sigma * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+};
+
+// ============================================================
+// STATE
+// ============================================================
+let currentModel = 'cho';
+let results = [];
+let currentMode = 'manual';
+
+function selectModel(btn) {
+  document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentModel = btn.dataset.model;
+  if (results.length) runPredictions();
+}
+
+function switchMode(mode, btn) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('mode-manual').style.display = mode === 'manual' ? '' : 'none';
+  document.getElementById('mode-csv').style.display = mode === 'csv' ? '' : 'none';
+  document.getElementById('mode-file').style.display = mode === 'file' ? '' : 'none';
+}
+
+// ============================================================
+// PARSING
+// ============================================================
+function parseManual(text) {
+  const samples = [];
+  const lines = text.trim().split('\n').filter(l => l.trim());
+  lines.forEach((line, i) => {
+    const parts = line.trim().split(/[\s,\t]+/);
+    if (parts.length === 1) {
+      const v = parseFloat(parts[0]);
+      if (!isNaN(v)) samples.push({ id: `S${String(i+1).padStart(2,'0')}`, delta: v });
+    } else if (parts.length >= 2) {
+      const id = parts[0];
+      const v = parseFloat(parts[1]);
+      if (!isNaN(v) && isNaN(parseFloat(id))) samples.push({ id, delta: v });
+      else if (!isNaN(parseFloat(parts[0]))) {
+        samples.push({ id: `S${String(i+1).padStart(2,'0')}`, delta: parseFloat(parts[0]) });
+      } else {
+        samples.push({ id, delta: v });
+      }
+    }
+  });
+  // Filter header-like rows
+  return samples.filter(s => !isNaN(s.delta) && s.id.toLowerCase() !== 'delta_ct' && s.id.toLowerCase() !== 'delta');
+}
+
+function parseCSV(text) {
+  const result = Papa.parse(text.trim(), { header: true, skipEmptyLines: true });
+  const rows = result.data;
+  const samples = [];
+  rows.forEach((row, i) => {
+    const keys = Object.keys(row).map(k => k.toLowerCase().trim());
+    const getVal = (names) => {
+      for (const n of names) {
+        const k = Object.keys(row).find(k => k.toLowerCase().trim() === n);
+        if (k !== undefined) return parseFloat(row[k]);
+      }
+      return NaN;
+    };
+    const id = row['sample_id'] || row['Sample ID'] || row['id'] || row['ID'] || `S${String(i+1).padStart(2,'0')}`;
+    let delta = getVal(['delta_ct', 'delta', 'Δct', 'dct']);
+    if (isNaN(delta)) {
+      const actb = getVal(['ct_actb', 'actb', 'actb_ct', 'actb qpcr']);
+      const s16 = getVal(['ct_16s', '16s', '16s_ct', '16s qpcr', 'ct16s']);
+      if (!isNaN(actb) && !isNaN(s16)) delta = actb - s16;
+    }
+    if (!isNaN(delta)) samples.push({ id: String(id).trim(), delta });
+  });
+  return samples;
+}
+
+// ============================================================
+// PREDICTIONS
+// ============================================================
+function predict(delta, modelFn, nBoot) {
+  const ci = bootstrapCI(delta, nBoot, modelFn);
+  const pct = modelFn(delta);
+  return { pct, lo: ci.lo, hi: ci.hi };
+}
+
+function runPredictions() {
+  let samples = [];
+
+  if (currentMode === 'manual') {
+    samples = parseManual(document.getElementById('manual-input').value);
+  } else if (currentMode === 'csv') {
+    samples = parseCSV(document.getElementById('csv-input').value);
+  }
+
+  if (!samples.length) {
+    alert('No valid samples found. Please check your input format.');
+    return;
+  }
+
+  const modelFn = currentModel === 'cho' ? choModel :
+                  currentModel === 'linear' ? logitLinearModel :
+                  delta => (choModel(delta) * 0.7 + logitLinearModel(delta) * 0.3);
+
+  const nBoot = parseInt(document.getElementById('n-boot').value) || 500;
+  const targetReads = parseFloat(document.getElementById('target-reads').value) || 50;
+  const totalDepth = parseFloat(document.getElementById('total-depth').value) || 150;
+
+  results = samples.map(s => {
+    const { pct, lo, hi } = predict(s.delta, modelFn, nBoot);
+    const requiredTotal = pct > 0.1 ? (targetReads / (pct / 100)).toFixed(1) : '—';
+    const regime = pct < 4 ? 'low' : pct > 98 ? 'high' : 'valid';
+    const actualMicrobial = (totalDepth * pct / 100).toFixed(1);
+    return { ...s, pct, lo, hi, regime, requiredTotal, actualMicrobial };
+  });
+
+  renderChart(results, modelFn);
+  renderTable(results, targetReads, totalDepth);
+}
+
+// ============================================================
+// CHART
+// ============================================================
+function renderChart(samples, modelFn) {
+  const canvas = document.getElementById('chart');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const W = rect.width || canvas.parentElement.clientWidth - 2;
+  const H = 220;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const pad = { top: 16, right: 20, bottom: 36, left: 50 };
+  const cW = W - pad.left - pad.right;
+  const cH = H - pad.top - pad.bottom;
+
+  const xMin = -15, xMax = 30;
+  const yMin = 0, yMax = 100;
+
+  const xScale = d => pad.left + (d - xMin) / (xMax - xMin) * cW;
+  const yScale = v => pad.top + cH - (v - yMin) / (yMax - yMin) * cH;
+
+  // Background
+  ctx.fillStyle = '#f8f9fc';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid
+  ctx.strokeStyle = '#e0e4ef';
+  ctx.lineWidth = 1;
+  for (let y = 0; y <= 100; y += 20) {
+    ctx.beginPath(); ctx.moveTo(pad.left, yScale(y)); ctx.lineTo(pad.left + cW, yScale(y)); ctx.stroke();
+  }
+  for (let x = -10; x <= 30; x += 5) {
+    ctx.beginPath(); ctx.moveTo(xScale(x), pad.top); ctx.lineTo(xScale(x), pad.top + cH); ctx.stroke();
+  }
+
+  // Failure zones
+  ctx.fillStyle = 'rgba(255,51,85,0.06)';
+  ctx.fillRect(pad.left, yScale(4), cW, yScale(0) - yScale(4));
+  ctx.fillRect(pad.left, pad.top, cW, yScale(98) - pad.top);
+
+  // Reference lines
+  const drawDash = (y, color, label) => {
+    ctx.strokeStyle = color; ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(pad.left, yScale(y)); ctx.lineTo(pad.left + cW, yScale(y)); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = color; ctx.font = '9px IBM Plex Mono'; ctx.textAlign = 'left';
+    ctx.fillText(label, pad.left + 4, yScale(y) - 3);
+  };
+  drawDash(4, 'rgba(255,107,53,0.7)', '4% threshold');
+  drawDash(98, 'rgba(255,51,85,0.5)', '98% threshold');
+
+  // Sigmoid curve
+  ctx.strokeStyle = '#0070cc'; ctx.lineWidth = 2.5; ctx.setLineDash([]);
+  ctx.beginPath();
+  for (let d = xMin; d <= xMax; d += 0.1) {
+    const x = xScale(d), y = yScale(modelFn(d));
+    d === xMin ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Axes
+  ctx.strokeStyle = '#c8d0e0'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.left, pad.top); ctx.lineTo(pad.left, pad.top + cH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(pad.left, pad.top + cH); ctx.lineTo(pad.left + cW, pad.top + cH); ctx.stroke();
+
+  // Axis labels
+  ctx.fillStyle = '#6b7a99'; ctx.font = '9px IBM Plex Mono'; ctx.textAlign = 'center';
+  for (let x = -10; x <= 30; x += 5) {
+    ctx.fillText(x, xScale(x), pad.top + cH + 14);
+  }
+  ctx.textAlign = 'right';
+  for (let y = 0; y <= 100; y += 20) {
+    ctx.fillText(y + '%', pad.left - 5, yScale(y) + 3);
+  }
+  ctx.fillText('ΔCt', pad.left + cW / 2, H - 4);
+
+  // Sample dots
+  samples.forEach(s => {
+    const x = xScale(s.delta);
+    const y = yScale(s.pct);
+    const color = s.regime === 'low' ? '#ff3355' : s.regime === 'high' ? '#a855f7' : '#00e676';
+
+    // CI bar
+    ctx.strokeStyle = color + '55'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, yScale(s.lo)); ctx.lineTo(x, yScale(s.hi)); ctx.stroke();
+
+    // Dot
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#f8f9fc'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.stroke();
+  });
+}
+
+// ============================================================
+// TABLE
+// ============================================================
+function renderTable(data, targetReads, totalDepth) {
+  const area = document.getElementById('results-area');
+  document.getElementById('empty-state')?.remove();
+
+  const nLow = data.filter(d => d.regime === 'low').length;
+  const nValid = data.filter(d => d.regime === 'valid').length;
+  const nHigh = data.filter(d => d.regime === 'high').length;
+  const medPct = [...data].sort((a,b) => a.pct - b.pct)[Math.floor(data.length/2)]?.pct.toFixed(1);
+
+  area.innerHTML = `
+    <div class="results-header">
+      <div class="results-title">Predictions — ${data.length} samples</div>
+      <div class="stats-row">
+        <div class="stat"><span class="stat-val">${nValid}</span><span class="stat-label">Valid</span></div>
+        <div class="stat"><span class="stat-val" style="color:var(--danger)">${nLow}</span><span class="stat-label">&lt;4% regime</span></div>
+        <div class="stat"><span class="stat-val" style="color:var(--purple)">${nHigh}</span><span class="stat-label">&gt;98%</span></div>
+        <div class="stat"><span class="stat-val">${medPct}%</span><span class="stat-label">Median pred.</span></div>
+      </div>
+      <button class="export-btn" onclick="exportCSV()">↓ Export CSV</button>
+    </div>
+    <table class="fade-in">
+      <thead>
+        <tr>
+          <th>Sample ID</th>
+          <th>ΔCt</th>
+          <th>Predicted %</th>
+          <th>95% CI</th>
+          <th>Microbial fraction</th>
+          <th>Regime</th>
+          <th>At ${totalDepth}M reads → microbial</th>
+          <th>To reach ${targetReads}M microbial → need</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${data.map(d => {
+          const pctColor = d.regime === 'low' ? 'var(--danger)' : d.regime === 'high' ? 'var(--purple)' : 'var(--success)';
+          const regimeLabel = d.regime === 'low'
+            ? `<span style="color:var(--danger);background:rgba(255,51,85,0.1);padding:1px 6px;font-size:9px;">LOW-ΔCt</span>`
+            : d.regime === 'high'
+            ? `<span style="color:var(--purple);background:rgba(168,85,247,0.1);padding:1px 6px;font-size:9px;">SATURATED</span>`
+            : `<span style="color:var(--success);background:rgba(0,230,118,0.08);padding:1px 6px;font-size:9px;">VALID</span>`;
+          const barPct = Math.min(100, d.pct);
+          const barColor = d.regime === 'low' ? 'var(--danger)' : d.regime === 'high' ? 'var(--purple)' : 'var(--success)';
+          return `<tr>
+            <td class="id-col">${d.id}</td>
+            <td class="delta-col">${d.delta.toFixed(2)}</td>
+            <td class="pred-col" style="color:${pctColor}">${d.pct.toFixed(2)}%</td>
+            <td class="ci-col">[${d.lo.toFixed(1)}%,&nbsp;${d.hi.toFixed(1)}%]</td>
+            <td class="bar-cell">
+              <div class="bar-wrap"><div class="bar-fill" style="width:${barPct}%;background:${barColor}"></div></div>
+            </td>
+            <td class="regime-col">${regimeLabel}</td>
+            <td class="depth-col" style="color:var(--text)">${d.actualMicrobial}M</td>
+            <td class="depth-col" style="color:var(--yellow)">${d.requiredTotal}M total</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+// ============================================================
+// EXPORT
+// ============================================================
+function exportCSV() {
+  if (!results.length) return;
+  const header = ['sample_id','delta_ct','pred_pct','ci_lo','ci_hi','regime','actual_microbial_M','required_total_M'];
+  const rows = results.map(d => [
+    d.id, d.delta.toFixed(3), d.pct.toFixed(3), d.lo.toFixed(2), d.hi.toFixed(2),
+    d.regime, d.actualMicrobial, d.requiredTotal
+  ]);
+  const csv = [header, ...rows].map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'ctomics_predictions.csv';
+  a.click();
+}
+
+// ============================================================
+// FILE DROP
+// ============================================================
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('dragover');
+  handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+
+function handleFile(file) {
+  if (!file) return;
+  document.getElementById('file-hint').textContent = `Loaded: ${file.name}`;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text = e.target.result;
+    // Store in csv input for reuse
+    document.getElementById('csv-input').value = text;
+    currentMode = 'csv';
+  };
+  reader.readAsText(file);
+}
+
+// ============================================================
+// DEMO DATA
+// ============================================================
+window.addEventListener('load', () => {
+  document.getElementById('manual-input').value =
+`AH-PS-001\t7.73
+AH-PS-003\t14.29
+HSV-11\t14.20
+HSV-8\t1.41
+S01\t20.18
+S49\t2.24
+S92\t-13.45
+BAL-042\t1.20
+BAL-007\t2.85
+BAL-031\t0.44`;
+
+ // Draw initial empty curve once layout is settled
+  requestAnimationFrame(() => {
+    renderChart([], choModel);
+  });
+});
+
+// ResizeObserver fires exactly when the container changes size
+// — more reliable than window resize which fires before layout updates
+let resizeTimer;
+const ro = new ResizeObserver(() => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    const modelFn = currentModel === 'cho' ? choModel :
+                    currentModel === 'linear' ? logitLinearModel :
+                    delta => (choModel(delta) * 0.7 + logitLinearModel(delta) * 0.3);
+    renderChart(results.length ? results : [], modelFn);
+  }, 50); // 50ms debounce — smooth without thrashing
+});
+ro.observe(document.getElementById('chart').parentElement);
+</script>
+</body>
+</html>
