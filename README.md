@@ -42,8 +42,6 @@ This model achieves R² = 0.990 on stool and oropharyngeal samples, but underest
 - Predictive error in this regime has the greatest clinical consequence
 
 > Cho MY, Wandro S, Fadrosh D, et al. *Two-Target Quantitative PCR To Predict Library Composition for Shallow Shotgun Sequencing.* mSystems. 2021;6(4):e00552-21. doi:[10.1128/mSystems.00552-21](https://doi.org/10.1128/mSystems.00552-21)
-This works well for **stool and oropharyngeal samples** (ΔCt 5–20). However:
-
 
 
 ## What CTomics Does
