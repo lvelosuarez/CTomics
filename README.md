@@ -4,43 +4,53 @@
 
 **CT-Based Prediction of Host–Microbiome Library Composition Prior to Shotgun Sequencing**
 
----
+## The Problem
 
-## Background
+In host-associated samples (e.g., BAL, rectal swabs, oropharyngeal swabs), shotgun metagenomic libraries are dominated by human DNA. After computational host depletion against GRCh38, microbial reads can represent as little as **0.01–5% of total sequenced reads** — but this is only known *after* sequencing.
 
-Shotgun metagenomic sequencing of microbiome samples — such as bronchoalveolar lavage (BAL) fluid, rectal swabs, or stool — is routinely used to profile microbial communities, detect pathogens, and characterise antibiotic resistance genes. However, a fundamental challenge in host-microbiome metagenomics is that total DNA extracted from a sample is dominated by the host (human) genome. After host-read filtering, the fraction of reads that are actually microbial can be as low as 0.01–5% in some samples.
+This creates two failure modes:
+- **Underpowering**: insufficient microbial depth for resistome profiling, taxonomic resolution, or functional analysis
+- **Oversequencing**: wasted reads and cost when the host fraction is unexpectedly high
 
-This creates a critical sequencing budget problem: the host: microbe ratio is only known **after** sequencing, by which point the cost has already been incurred. Analyses requiring tens of millions of microbial reads (e.g., ~50 M reads for antimicrobial resistance profiling) may fail entirely if the sequencing depth is insufficient, or money is wasted on lanes of data that are 99% host.
+## The Approach
 
----
+CTomics uses **two routine qPCR measurements** taken before sequencing to predict microbial read fraction:
 
-## What is CTomics?
+| Measurement | Target | Proxy for |
+|---|---|---|
+| `Ct_16S` | 16S rRNA gene | Total bacterial DNA load |
+| `Ct_ACTB` | Human β-actin gene | Total human DNA load |
 
-Two routine qPCR assays carry enough information to estimate the microbial fraction before sequencing:
+From these, a single derived feature is computed:
 
-- **16S rRNA qPCR** (Ct_16S): proxy for total bacterial load
-- **β-actin qPCR** (Ct_ACTB): proxy for total human DNA load
+```
+ΔCt = Ct_ACTB − Ct_16S
+```
 
-The delta value ΔCt = Ct_ACTB − Ct_16S captures the relative abundance of bacteria vs. human in the extraction. Cho et al. (2021) have already shown this relationship follows a sigmoidal curve with R² = 0.990 across diverse sample types. However, their Model E was trained primarily on stool and oropharyngeal samples. Low-biomass respiratory samples, such as BAL, fall in the sigmoid's floor region (ΔCt < 5), where the model has limited resolution and clinical impact is highest.
+Higher ΔCt → more bacterial DNA relative to human DNA → higher expected microbial read fraction.
 
-**CTomics extends this approach to BAL lung samples** by combining the Cho et al. training data with real sequencing data from the REPAIR cohort, building and evaluating machine learning models that better predict the microbial fraction in low-microbiome biomass samples.
+## Why Not Just Use the Cho et al. Model?
 
----
+Cho et al. (2021, *mSystems*, DOI: [10.1128/msystems.00552-21](https://doi.org/10.1128/msystems.00552-21)) showed that ΔCt follows a sigmoidal relationship with sequencing microbial fraction (R² = 0.990). Their Model E is:
 
-## Objectives
+$$\hat{y} = \frac{2.7201549}{99.50267 \cdot e^{-0.7218 \cdot \Delta Ct} + 0.02733}$$
 
-1. **Compile a multi-source training dataset** combining:
-   - Cho et al. 2021 (n = 109; stool, oropharyngeal, rectal swab, vaginal samples)
-   - REPAIR cohort (n = 85; lung BAL from BPCO patients)
+This model achieves R² = 0.990 on stool and oropharyngeal samples, but underestimates microbial fractions in transition-zone and low-biomass samples. CTomics aims to improve on this baseline specifically for clinical respiratory specimens.
 
-2. **Train and benchmark ML models** to predict `% microbial reads` from Ct_16S, Ct_ACTB, and derived features (ΔCt, polynomial terms), using cross-validation with sample-type-aware splits.
+- The sigmoid has a **lower asymptote of ~0.027%** — it cannot resolve samples below ~4% microbial reads
+- Low-biomass samples such as **BAL fluid** cluster precisely in this compressed lower tail (ΔCt < 5)
+- Predictive error in this regime has the greatest clinical consequence
 
-3. **Estimate sequencing requirements** from a sample's qPCR profile:
-   - Expected microbial read count for a planned sequencing depth
-   - Minimum sequencing depth to reach a target (e.g. 50 M microbial reads)
-   - Flag samples that require host depletion prior to library preparation
+> Cho MY, Wandro S, Fadrosh D, et al. *Two-Target Quantitative PCR To Predict Library Composition for Shallow Shotgun Sequencing.* mSystems. 2021;6(4):e00552-21. doi:[10.1128/mSystems.00552-21](https://doi.org/10.1128/mSystems.00552-21)
 
-4. **Enable informed pre-sequencing decisions** — deplete, re-extract, or reprioritise samples before committing sequencing budget.
+
+## What CTomics Does
+
+CTomics extends the Cho framework into the **low-ΔCt regime** by:
+
+1. Integrating Cho et al. training data with matched qPCR + sequencing data from the **REPAIR cohort** (BAL samples)
+2. Training and benchmarking multiple machine learning models (Beta regression, Gaussian Process, gradient boosting, etc.) specifically optimised for the low-biomass region
+3. Providing calibrated predictions with uncertainty estimates to support **a priori sequencing depth decisions**
 
 ---
 
@@ -72,40 +82,14 @@ CTomics/
 
 ---
 
-## Reference Model
-
-Cho et al. (2021) proposed Model E, a four-parameter sigmoidal function:
-
-$$\hat{y} = \frac{2.7201549}{99.50267 \cdot e^{-0.7218 \cdot \Delta Ct} + 0.02733}$$
-
-This model achieves R² = 0.990 on stool and oropharyngeal samples, but underestimates microbial fractions in transition-zone and low-biomass samples. CTomics aims to improve on this baseline specifically for clinical respiratory specimens.
-
-> Cho MY, Wandro S, Fadrosh D, et al. *Two-Target Quantitative PCR To Predict Library Composition for Shallow Shotgun Sequencing.* mSystems. 2021;6(4):e00552-21. doi:[10.1128/mSystems.00552-21](https://doi.org/10.1128/mSystems.00552-21)
-
----
-
 ## Data Sources
 
-**Cho et al. 2021** — Ct values transcribed from Table S3 of the supplementary material. Percent microbial reads for validation samples (rectal swab, vaginal; n = 20) were digitised from Figure 2C. Training samples (stool, oropharyngeal; n = 89) use Model E predictions as surrogates, since individual points are not resolvable in the published figure at the sigmoid floor/ceiling.
+**Cho et al. 2021** — Ct values transcribed from Table S3 of the supplementary material. Percent microbial reads for validation samples (rectal swab, vaginal; n = 20) were re-analyzed from their ncbi repository. 
 
 **REPAIR cohort** — Bronchoalveolar lavage samples from patients with rheumatoid arthritis-associated interstitial lung disease. Ct_16S and Ct_ACTB were measured by SYBR Green and TaqMan qPCR, respectively. Percent microbial reads computed from real Illumina shotgun sequencing after KneadData host filtering.
 
 ---
 
-## Dependencies
-
-```
-python >= 3.10
-polars
-scikit-learn
-scipy
-matplotlib
-joblib
-pyreadr        # to load R objects
-rdata          # to parse RDX3-format .Rdata files
-```
-
----
 
 ## License
 
