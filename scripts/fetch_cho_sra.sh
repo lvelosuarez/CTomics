@@ -5,12 +5,12 @@
 # dehost with hostile, and summarise host-removal statistics per sample.
 #
 # REQUIREMENTS:
-#   conda install -c bioconda sra-tools hostile bowtie2 pigz bbtools
+#   conda install -c bioconda sra-tools hostile bowtie2 pigz fastp
 #   hostile fetch --name human-t2t-hla-argos985
 #
 # OUTPUT:
-#   cho_qc/               – per-sample BBDuk-trimmed FASTQs
-#   cho_bbduk_logs/       – per-sample BBDuk logs
+#   cho_qc/               – per-sample fastp-trimmed FASTQs
+#   cho_bbduk_logs/       – per-sample fastp logs (json + html + log)
 #   cho_dehost/           – per-sample dehosted FASTQs
 #   cho_hostile_logs/     – per-sample hostile logs
 #   cho_hostile_stats.csv – sample | reads_in | reads_removed_proportion | reads_out
@@ -58,9 +58,9 @@ while IFS= read -r SRR; do
     --progress \
     --temp "$FASTQ_DIR/tmp"
 
-  # Compress immediately after dump
+  # Compress immediately after dump (gzip single-stream for Java/BBDuk compatibility)
   echo "  Compressing $SRR ..."
-  pigz -p "$THREADS" "$FASTQ_DIR"/${SRR}*.fastq
+  gzip "$FASTQ_DIR"/${SRR}*.fastq
 
   echo "  [DONE] $SRR"
 
@@ -68,8 +68,8 @@ done < AccessionList.txt
 
 echo "=== Download complete ==="
 
-# ── Step 3: QC with BBDuk ────────────────────────────────────────────────────
-echo "=== Step 3: QC samples with BBDuk ==="
+# ── Step 3: QC with fastp ─────────────────────────────────────────────────────
+echo "=== Step 3: QC samples with fastp ==="
 
 for R1 in "$FASTQ_DIR"/*_1.fastq.gz; do
   SAMPLE="${R1##*/}"
@@ -81,26 +81,31 @@ for R1 in "$FASTQ_DIR"/*_1.fastq.gz; do
     continue
   fi
 
-  # Skip if QC output already exists
-  if [[ -f "$QC_DIR/${SAMPLE}_1.fastq.gz" ]]; then
+  # Skip if QC output already exists and is non-empty
+  if [[ -s "$QC_DIR/${SAMPLE}_1.fastq.gz" ]]; then
     echo "[SKIP] $SAMPLE — QC already done"
     continue
   fi
 
-  echo "[INFO] BBDuk: $SAMPLE"
+  echo "[INFO] fastp: $SAMPLE"
 
-  bbduk.sh \
-    in="$R1" in2="$R2" \
-    ref=adapters,artifacts,lambda,pjet,mtst,kapa \
-    out="$QC_DIR/${SAMPLE}_1.fastq.gz" out2="$QC_DIR/${SAMPLE}_2.fastq.gz" \
-    qtrim=rl trimq=20 maq=20 minlen=100 \
-    threads="$THREADS" \
-    2>&1 | tee "$QC_LOG_DIR/${SAMPLE}.bbduk.log"
+  fastp \
+    --in1 "$R1" --in2 "$R2" \
+    --out1 "$QC_DIR/${SAMPLE}_1.fastq.gz" --out2 "$QC_DIR/${SAMPLE}_2.fastq.gz" \
+    --cut_front --cut_front_mean_quality 20 \
+    --cut_tail  --cut_tail_mean_quality  20 \
+    --average_qual 20 \
+    --length_required 100 \
+    --detect_adapter_for_pe \
+    --thread "$THREADS" \
+    --json "$QC_LOG_DIR/${SAMPLE}.fastp.json" \
+    --html "$QC_LOG_DIR/${SAMPLE}.fastp.html" \
+    2>&1 | tee "$QC_LOG_DIR/${SAMPLE}.fastp.log"
 
   echo "[INFO] Done: $SAMPLE"
 done
 
-echo "[INFO] BBDuk QC complete"
+echo "[INFO] fastp QC complete"
 
 # ── Step 4: Dehost with hostile ──────────────────────────────────────────────
 echo "=== Step 4: Dehost samples with hostile ==="
