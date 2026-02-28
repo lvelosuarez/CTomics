@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
 # fetch_cho_sra.sh
-# Download Cho et al. 2021 shotgun reads (PRJNA718445), QC with BBDuk,
+# Download Cho et al. 2021 shotgun reads (PRJNA718445), QC with fastp,
 # dehost with hostile, and summarise host-removal statistics per sample.
 #
 # REQUIREMENTS:
@@ -19,6 +19,8 @@
 set -euo pipefail
 
 BIOPROJECT="PRJNA718445"
+THREADS=10
+DEHOST_THREADS=20
 FASTQ_DIR="cho_fastqs"
 QC_DIR="cho_qc"
 QC_LOG_DIR="cho_bbduk_logs"
