@@ -1,33 +1,37 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
 # fetch_cho_sra.sh
-# Download Cho et al. 2021 shotgun reads (PRJNA718445) and compute
-# % microbial reads for each sample using KneadData.
+# Download Cho et al. 2021 shotgun reads (PRJNA718445), QC with BBDuk,
+# dehost with hostile, and summarise host-removal statistics per sample.
 #
-# REQUIREMENTS (install before running):
-#   conda install -c bioconda sra-tools kneaddata bowtie2 trimmomatic
-#   # KneadData human reference (GRCh38):
-#   kneaddata_database --download human_genome bowtie2 ./kneaddata_db/
+# REQUIREMENTS:
+#   conda install -c bioconda sra-tools hostile bowtie2 pigz bbtools
+#   hostile fetch --name human-t2t-hla-argos985
 #
 # OUTPUT:
-#   cho_kneaddata_results/   – per-sample KneadData logs
-#   cho_microbial_reads.csv  – sample | reads_total | reads_microbial | pct_microbial
+#   cho_qc/               – per-sample BBDuk-trimmed FASTQs
+#   cho_bbduk_logs/       – per-sample BBDuk logs
+#   cho_dehost/           – per-sample dehosted FASTQs
+#   cho_hostile_logs/     – per-sample hostile logs
+#   cho_hostile_stats.csv – sample | reads_in | reads_removed_proportion | reads_out
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
 
 BIOPROJECT="PRJNA718445"
-KNEADDATA_DB="/mnt/san/microbio/database/kneaddata_db"     # adjust path to your bowtie2 human index
-THREADS=8
-OUTDIR="cho_kneaddata_results"
+THREADS=10
+DEHOST_THREADS=20
 FASTQ_DIR="cho_fastqs"
+QC_DIR="cho_qc"
+QC_LOG_DIR="cho_bbduk_logs"
+DEHOST_DIR="cho_dehost"
+LOG_DIR="cho_hostile_logs"
+OUT_CSV="cho_hostile_stats.csv"
 
-mkdir -p "$OUTDIR" "$FASTQ_DIR"
+mkdir -p "$FASTQ_DIR" "$FASTQ_DIR/tmp" "$QC_DIR" "$QC_LOG_DIR" "$DEHOST_DIR" "$LOG_DIR"
 
+# ── Step 1: Check accession list ─────────────────────────────────────────────
 echo "=== Step 1: Fetch SRA run list for ${BIOPROJECT} ==="
-# Requires esearch/efetch (entrez-direct) or just use the accession list from
-# SRA Run Selector: https://www.ncbi.nlm.nih.gov/Traces/study/?acc=PRJNA718445
-# Save the AccessionList.txt from there, then run this script.
 
 if [ ! -f "AccessionList.txt" ]; then
   echo "Please download AccessionList.txt from:"
@@ -36,71 +40,126 @@ if [ ! -f "AccessionList.txt" ]; then
   exit 1
 fi
 
+# ── Step 2: Download FASTQs ──────────────────────────────────────────────────
 echo "=== Step 2: Download FASTQs ==="
-while IFS= read -r SRR; do
-  [[ -z "$SRR" ]] && continue
-  echo "  Downloading $SRR ..."
-  prefetch "$SRR" --output-directory "$FASTQ_DIR"
-  fastq-dump --gzip --split-files \
-    --outdir "$FASTQ_DIR" \
-    "$FASTQ_DIR/${SRR}/${SRR}.sra" 2>/dev/null \
-    || fasterq-dump "$SRR" --outdir "$FASTQ_DIR" --threads "$THREADS"
-done < AccessionList.txt
-
-echo "=== Step 3: Run KneadData and compute % microbial reads ==="
-echo "sample,reads_total,reads_microbial,pct_microbial" > cho_microbial_reads.csv
 
 while IFS= read -r SRR; do
   [[ -z "$SRR" ]] && continue
 
-  R1="${FASTQ_DIR}/${SRR}_1.fastq.gz"
-  R2="${FASTQ_DIR}/${SRR}_2.fastq.gz"
-
-  # Paired-end check
-  if [ -f "$R1" ] && [ -f "$R2" ]; then
-    KNEADDATA_ARGS="-i1 $R1 -i2 $R2"
-  elif [ -f "$R1" ]; then
-    KNEADDATA_ARGS="-i $R1"
-  else
-    echo "  WARNING: no FASTQ found for $SRR – skipping"
+  # Skip if FASTQ already exists
+  if ls "$FASTQ_DIR"/${SRR}*.fastq.gz 1>/dev/null 2>&1; then
+    echo "  [SKIP] $SRR — FASTQ already present"
     continue
   fi
 
-  echo "  KneadData: $SRR ..."
-  kneaddata \
-    $KNEADDATA_ARGS \
-    --reference-db "$KNEADDATA_DB" \
-    --output "${OUTDIR}/${SRR}" \
+  echo "  Downloading $SRR ..."
+  fasterq-dump "$SRR" \
+    --outdir "$FASTQ_DIR" \
     --threads "$THREADS" \
-    --trimmomatic-options "SLIDINGWINDOW:4:20 MINLEN:50" \
-    --bowtie2-options "--very-sensitive" \
-    --remove-intermediate-output \
-    --log "${OUTDIR}/${SRR}/kneaddata.log"
+    --skip-technical \
+    --progress \
+    --temp "$FASTQ_DIR/tmp"
 
-  # Parse read counts from KneadData log
-  LOG="${OUTDIR}/${SRR}/kneaddata.log"
-  TOTAL=$(grep -oP "(?<=Total reads after trimming: )\d+" "$LOG" | head -1 || echo 0)
-  MICROBIAL=$(grep -oP "(?<=Final contaminant reads: )" "$LOG" || true)
-  # More robust: count final output reads
-  MICROBIAL=$(zcat "${OUTDIR}/${SRR}"/*kneaddata_paired*.fastq.gz 2>/dev/null | \
-              awk 'NR%4==1' | wc -l || echo 0)
-  TOTAL=$(zcat "${OUTDIR}/${SRR}"/*kneaddata.log 2>/dev/null | \
-          grep -oP "(?<=Total reads after trimming: )\d+" | head -1 || echo "$TOTAL")
+  # Compress immediately after dump
+  echo "  Compressing $SRR ..."
+  pigz -p "$THREADS" "$FASTQ_DIR"/${SRR}*.fastq
 
-  if [ "$TOTAL" -gt 0 ]; then
-    PCT=$(python3 -c "print(round(${MICROBIAL}/${TOTAL}*100, 4))")
-  else
-    PCT=0
-  fi
-
-  echo "  $SRR: total=${TOTAL}, microbial=${MICROBIAL}, pct=${PCT}%"
-  echo "${SRR},${TOTAL},${MICROBIAL},${PCT}" >> cho_microbial_reads.csv
+  echo "  [DONE] $SRR"
 
 done < AccessionList.txt
 
-echo ""
+echo "=== Download complete ==="
+
+# ── Step 3: QC with BBDuk ────────────────────────────────────────────────────
+echo "=== Step 3: QC samples with BBDuk ==="
+
+for R1 in "$FASTQ_DIR"/*_1.fastq.gz; do
+  SAMPLE="${R1##*/}"
+  SAMPLE="${SAMPLE/_1.fastq.gz/}"
+  R2="${FASTQ_DIR}/${SAMPLE}_2.fastq.gz"
+
+  if [[ ! -f "$R2" ]]; then
+    echo "[WARN] Missing R2 for $SAMPLE, skipping" >&2
+    continue
+  fi
+
+  # Skip if QC output already exists
+  if [[ -f "$QC_DIR/${SAMPLE}_1.fastq.gz" ]]; then
+    echo "[SKIP] $SAMPLE — QC already done"
+    continue
+  fi
+
+  echo "[INFO] BBDuk: $SAMPLE"
+
+  bbduk.sh \
+    in="$R1" in2="$R2" \
+    ref=adapters,artifacts,lambda,pjet,mtst,kapa \
+    out="$QC_DIR/${SAMPLE}_1.fastq.gz" out2="$QC_DIR/${SAMPLE}_2.fastq.gz" \
+    qtrim=rl trimq=20 maq=20 minlen=100 \
+    threads="$THREADS" \
+    2>&1 | tee "$QC_LOG_DIR/${SAMPLE}.bbduk.log"
+
+  echo "[INFO] Done: $SAMPLE"
+done
+
+echo "[INFO] BBDuk QC complete"
+
+# ── Step 4: Dehost with hostile ──────────────────────────────────────────────
+echo "=== Step 4: Dehost samples with hostile ==="
+
+for QC_R1 in "$QC_DIR"/*_1.fastq.gz; do
+  SAMPLE="${QC_R1##*/}"
+  SAMPLE="${SAMPLE/_1.fastq.gz/}"
+  QC_R2="${QC_DIR}/${SAMPLE}_2.fastq.gz"
+
+  if [[ ! -f "$QC_R2" ]]; then
+    echo "[WARN] Missing R2 for $SAMPLE, skipping" >&2
+    continue
+  fi
+
+  echo "[INFO] Processing $SAMPLE"
+
+  hostile clean \
+    --fastq1 "$QC_R1" \
+    --fastq2 "$QC_R2" \
+    --index human-t2t-hla-argos985 \
+    --aligner bowtie2 \
+    --airplane \
+    -o "$DEHOST_DIR" \
+    --threads "$DEHOST_THREADS" --force \
+    2>&1 | tee "$LOG_DIR/${SAMPLE}.hostile.log"
+
+  echo "[INFO] Done: $SAMPLE"
+done
+
+echo "[INFO] All samples processed"
+
+# ── Step 5: Summarise host-removal stats ─────────────────────────────────────
+echo "=== Step 5: Summarise hostile statistics ==="
+
+awk '
+  /"reads_in"/ {
+    gsub(",", "", $2);
+    reads_in[FILENAME] = $2 / 2;
+  }
+  /"reads_removed_proportion"/ {
+    gsub(",", "", $2);
+    rrp[FILENAME] = $2;
+  }
+  /"reads_out"/ {
+    gsub(",", "", $2);
+    reads_out[FILENAME] = $2 / 2;
+  }
+  END {
+    print "sample,reads_in,reads_removed_proportion,reads_out";
+    for (f in reads_in) {
+      split(f, parts, "/");
+      fname = parts[length(parts)];
+      sub(/\.hostile\.log$/, "", fname);
+      printf "%s,%.0f,%.5f,%.0f\n", fname, reads_in[f], rrp[f], reads_out[f];
+    }
+  }
+' "$LOG_DIR"/*hostile* > "$OUT_CSV"
+
 echo "=== Done! ==="
-echo "Results saved to cho_microbial_reads.csv"
-echo ""
-echo "Next step: join cho_microbial_reads.csv with Table S3 Ct values, then run:"
-echo "  python train_models.py --cho_sra cho_microbial_reads.csv --cho_ct TableS3.xlsx"
+echo "Results saved to $OUT_CSV"
