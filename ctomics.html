@@ -6,88 +6,51 @@
 <title>CTomics — Microbial Read Fraction Predictor</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=JetBrains+Mono:wght@300;400;500&display=swap');
 
 :root {
   --bg: #ffffff;
-  --bg2: #fafafa;
-  --bg3: #f2f2f2;
-  --border: #d0d0d0;
-  --border2: #b0b0b0;
-  --text: #0a0a0a;
-  --text-dim: #444444;
-  --text-muted: #888888;
-  --accent: #000000;
-  --accent2: #222222;
-  --warn: #cc4400;
-  --danger: #cc0022;
-  --success: #006630;
-  --purple: #5500cc;
-  --yellow: #885500;
-  --grid: #ebebeb;
+  --bg2: #f8fafc;
+  --bg3: #f1f5f9;
+  --border: #e2e8f0;
+  --border2: #cbd5e1;
+  --text: #0f172a;
+  --text-dim: #475569;
+  --text-muted: #94a3b8;
+  --accent: #0d9488;
+  --accent2: #0f766e;
+  --warn: #d97706;
+  --danger: #e11d48;
+  --success: #059669;
+  --purple: #7c3aed;
+  --yellow: #b45309;
+  --grid: #f1f5f9;
+  --radius: 6px;
+  --radius-sm: 4px;
 }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
-    font-family: 'Arial', monospace;
-    font-size: 15px;
+    font-family: 'DM Sans', 'Helvetica Neue', Helvetica, sans-serif;
+    font-size: 14px;
     background: var(--bg);
     color: var(--text);
     min-height: 100vh;
     overflow-x: hidden;
-  }
-
-
-
-  .header {
-    border-bottom: 1px solid var(--border);
-    padding: 20px 32px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--bg2);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
-
-  .header-left { display: flex; align-items: baseline; gap: 16px; }
-
-  .logo svg {
-    height: 60px;
-    width: auto;
-    display: block;
-  }
-
-
-  .tag {
-    font-size: 11px;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: #ffffff;
-    background: var(--accent);
-    padding: 2px 8px;
-    font-weight: 600;
-  }
-
-  .header-right {
-    font-size: 10px;
-    color: var(--text-dim);
-    letter-spacing: 0.05em;
-    text-align: right;
-    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
   }
 
   .main {
     display: grid;
-    grid-template-columns: 380px 1fr;
+    grid-template-columns: 360px 1fr;
     grid-template-rows: auto 1fr;
-    min-height: calc(100vh - 65px);
+    min-height: calc(100vh - 56px);
   }
 
   /* ---- LEFT PANEL ---- */
   .panel-left {
+    background: var(--bg2);
     border-right: 1px solid var(--border);
     display: flex;
     flex-direction: column;
@@ -95,26 +58,22 @@
   }
 
   .section {
+    padding: 18px 20px;
     border-bottom: 1px solid var(--border);
-    padding: 20px 24px;
   }
 
   .section-title {
-    font-size: 9px;
-    letter-spacing: 0.2em;
+    font-family: 'Jost', sans-serif;
+    font-size: 10px;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
-    color: var(--text-dim);
-    margin-bottom: 14px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    font-weight: 700;
   }
 
   .section-title::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border);
+    content: none;
   }
 
   /* Model selector */
@@ -125,78 +84,99 @@
   }
 
   .model-btn {
-    background: var(--bg3);
-    border: 1px solid var(--border);
+    background: var(--bg);
+    border: 1.5px solid var(--border);
     color: var(--text-dim);
-    font-family: inherit;
-    font-size: 11px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 400;
     padding: 10px 14px;
     cursor: pointer;
     text-align: left;
-    transition: all 0.15s;
+    transition: all 0.18s;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    border-radius: var(--radius-sm);
   }
 
-  .model-btn:hover { border-color: var(--accent2); color: var(--text); }
-  .model-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.05); }
-  .model-btn .badge {
-    font-size: 8px;
-    padding: 1px 5px;
-    background: var(--border2);
-    color: var(--text-dim);
-    letter-spacing: 0.1em;
+  .model-btn:hover { border-color: var(--accent); color: var(--text); background: rgba(13,148,136,0.08); }
+  .model-btn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(13,148,136,0.08);
+    box-shadow: inset 3px 0 0 var(--accent);
   }
-  .model-btn.active .badge { background: rgba(0,212,255,0.15); color: var(--accent); }
+  .model-btn .badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 2px 8px;
+    background: var(--bg3);
+    color: var(--text-muted);
+    border-radius: 100px;
+    letter-spacing: 0.04em;
+  }
+  .model-btn.active .badge { background: rgba(13,148,136,0.1); color: var(--accent); }
 
   /* Input area */
   .input-mode { display: flex; gap: 4px; margin-bottom: 12px; }
   .mode-btn {
     flex: 1;
-    background: var(--bg3);
-    border: 1px solid var(--border);
+    background: var(--bg);
+    border: 1.5px solid var(--border);
     color: var(--text-dim);
-    font-family: inherit;
-    font-size: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
     padding: 7px;
     cursor: pointer;
-    letter-spacing: 0.05em;
-    transition: all 0.15s;
+    letter-spacing: 0.02em;
+    transition: all 0.18s;
+    border-radius: var(--radius-sm);
   }
-  .mode-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.05); }
+  .mode-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(13,148,136,0.04); }
+  .mode-btn:hover:not(.active) { border-color: var(--accent); color: var(--text); background: rgba(13,148,136,0.06); }
 
   textarea {
     width: 100%;
     background: var(--bg);
-    border: 1px solid var(--border);
+    border: 1.5px solid var(--border);
     color: var(--text);
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
     padding: 12px;
     resize: vertical;
     min-height: 160px;
-    line-height: 1.6;
+    line-height: 1.7;
     outline: none;
-    transition: border-color 0.15s;
+    transition: border-color 0.18s, box-shadow 0.18s;
+    border-radius: var(--radius-sm);
   }
-  textarea:focus { border-color: var(--accent2); }
-  textarea::placeholder { color: var(--text-muted); }
+  textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(13,148,136,0.1); }
+  textarea::placeholder { color: var(--text-muted); font-size: 11px; }
 
-  .hint { font-size: 10px; color: var(--text-dim); margin-top: 8px; line-height: 1.5; }
-  .hint code { color: var(--accent); background: rgba(0,212,255,0.08); padding: 1px 4px; }
+  .hint { font-size: 11.5px; color: var(--text-muted); margin-top: 8px; line-height: 1.6; }
+  .hint code {
+    color: var(--accent);
+    background: rgba(13,148,136,0.08);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+  }
 
   .file-drop {
-    border: 1px dashed var(--border2);
-    padding: 24px;
+    border: 1.5px dashed var(--border2);
+    padding: 28px 20px;
     text-align: center;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.18s;
     background: var(--bg);
+    border-radius: var(--radius);
   }
-  .file-drop:hover, .file-drop.dragover { border-color: var(--accent); background: rgba(0,212,255,0.03); }
-  .file-drop .drop-icon { font-size: 28px; margin-bottom: 8px; }
-  .file-drop p { font-size: 11px; color: var(--text-dim); line-height: 1.6; }
+  .file-drop:hover, .file-drop.dragover { border-color: var(--accent); background: rgba(13,148,136,0.06); }
+  .file-drop .drop-icon { font-size: 22px; margin-bottom: 8px; opacity: 0.4; }
+  .file-drop p { font-size: 12px; color: var(--text-dim); line-height: 1.7; }
   .file-drop input { display: none; }
 
   /* Params */
@@ -206,56 +186,68 @@
     align-items: center;
     margin-bottom: 10px;
   }
-  .param-label { font-size: 10px; color: var(--text-dim); }
+  .param-label { font-size: 12.5px; color: var(--text-dim); }
   .param-input {
     background: var(--bg);
-    border: 1px solid var(--border);
+    border: 1.5px solid var(--border);
     color: var(--text);
-    font-family: inherit;
-    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
     padding: 5px 10px;
-    width: 100px;
+    width: 90px;
     text-align: right;
     outline: none;
+    border-radius: var(--radius-sm);
+    transition: border-color 0.18s, box-shadow 0.18s;
   }
-  .param-input:focus { border-color: var(--accent2); }
+  .param-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(13,148,136,0.1); }
 
   .run-btn {
     width: 100%;
-    background: var(--accent);
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
     border: none;
     color: #ffffff;
-    font-family: inherit;
+    font-family: 'Jost', sans-serif;
     font-size: 12px;
     font-weight: 700;
-    letter-spacing: 0.15em;
+    letter-spacing: 0.2em;
     text-transform: uppercase;
     padding: 14px;
     cursor: pointer;
     margin-top: 16px;
-    transition: all 0.15s;
+    transition: all 0.2s;
+    border-radius: var(--radius-sm);
+    box-shadow: 0 2px 10px rgba(13,148,136,0.28);
   }
-  .run-btn:hover { background: var(--accent2); }
-  .run-btn:active { transform: scale(0.99); }
+  .run-btn:hover {
+    background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
+    box-shadow: 0 4px 14px rgba(13,148,136,0.38);
+    transform: translateY(-1px);
+  }
+  .run-btn:active { transform: translateY(0); box-shadow: 0 1px 4px rgba(13,148,136,0.2); }
 
   /* ---- RIGHT PANEL ---- */
   .panel-right {
     display: flex;
     flex-direction: column;
+    background: var(--bg);
   }
 
   .viz-area {
-    padding: 24px 28px;
-    border-bottom: 1px solid var(--border);
+    padding: 22px 28px 18px;
     flex: 0 0 auto;
+    border-bottom: 1px solid var(--border);
   }
 
   .chart-title {
+    font-family: 'Jost', sans-serif;
     font-size: 10px;
-    letter-spacing: 0.15em;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: var(--text-dim);
-    margin-bottom: 16px;
+    color: var(--text-muted);
+    font-weight: 700;
+    margin-bottom: 14px;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -265,6 +257,7 @@
     display: block;
     width: 100%;
     height: 220px;
+    border-radius: var(--radius-sm);
   }
 
   /* Results table */
@@ -278,201 +271,683 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 28px;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg2);
+    padding: 12px 28px;
+    background: var(--bg);
     position: sticky;
     top: 0;
     z-index: 10;
+    border-bottom: 1px solid var(--border);
   }
 
-  .results-title { font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-dim); }
+  .results-title {
+    font-family: 'Jost', sans-serif;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    font-weight: 700;
+  }
 
   .stats-row {
     display: flex;
-    gap: 24px;
+    gap: 20px;
   }
 
   .stat {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 1px;
   }
-  .stat-val { font-size: 16px; font-weight: 600; color: var(--accent); }
-  .stat-label { font-size: 9px; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase; }
+  .stat-val { font-size: 17px; font-weight: 700; color: var(--accent); font-family: 'Jost', sans-serif; }
+  .stat-label { font-size: 9px; color: var(--text-muted); letter-spacing: 0.12em; text-transform: uppercase; }
 
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 11px;
+    font-size: 13px;
   }
 
   thead th {
-    padding: 10px 16px;
+    padding: 9px 16px;
     text-align: left;
-    font-size: 9px;
-    letter-spacing: 0.12em;
+    font-family: 'Jost', sans-serif;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.13em;
     text-transform: uppercase;
-    color: var(--text-dim);
-    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
     white-space: nowrap;
-    background: var(--bg);
+    background: var(--bg2);
     position: sticky;
-    top: 48px;
+    top: 49px;
+    border-bottom: 1px solid var(--border);
   }
 
-  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
-  tbody tr:hover { background: rgba(0,212,255,0.03); }
+  tbody tr { transition: background 0.12s; }
+  tbody tr:hover { background: rgba(13,148,136,0.07); }
+  tbody tr:nth-child(even) { background: rgba(15,23,42,0.025); }
+  tbody tr:nth-child(even):hover { background: rgba(13,148,136,0.07); }
 
   td {
     padding: 9px 16px;
     white-space: nowrap;
+    border-bottom: 1px solid rgba(226,232,240,0.6);
   }
 
-  td.id-col { color: var(--text-dim); font-size: 10px; }
-  td.delta-col { color: var(--yellow); font-weight: 500; }
-  td.pred-col { font-weight: 600; }
-  td.ci-col { color: var(--text-dim); font-size: 10px; }
+  td.id-col { color: var(--text-dim); font-size: 12px; font-family: 'JetBrains Mono', monospace; }
+  td.delta-col { color: var(--yellow); font-weight: 500; font-family: 'JetBrains Mono', monospace; }
+  td.pred-col { font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+  td.ci-col { color: var(--text-muted); font-size: 11px; font-family: 'JetBrains Mono', monospace; }
 
   .warn-chip {
     display: inline-block;
-    font-size: 8px;
-    padding: 1px 5px;
-    letter-spacing: 0.1em;
+    font-size: 9.5px;
+    padding: 2px 7px;
+    letter-spacing: 0.07em;
     text-transform: uppercase;
     margin-left: 6px;
     font-weight: 600;
+    border-radius: 100px;
   }
 
   .bar-cell { min-width: 120px; }
-  .bar-wrap { background: var(--bg3); height: 6px; width: 100%; position: relative; }
+  .bar-wrap {
+    background: var(--bg3);
+    height: 5px;
+    width: 100%;
+    position: relative;
+    border-radius: 100px;
+    overflow: hidden;
+  }
   .bar-fill {
     height: 100%;
     transition: width 0.4s ease;
     position: absolute;
     left: 0;
     top: 0;
+    border-radius: 100px;
   }
 
-  .depth-col { font-family: 'IBM Plex Sans', sans-serif; font-size: 11px; }
-  .regime-col { font-size: 9px; letter-spacing: 0.1em; }
+  .depth-col { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+  .regime-col { font-size: 11px; letter-spacing: 0.04em; }
 
   .empty-state {
-    padding: 60px 28px;
+    padding: 80px 28px;
     text-align: center;
-    color: var(--text-dim);
+    color: var(--text-muted);
   }
-  .empty-state .big { font-size: 40px; margin-bottom: 12px; opacity: 0.3; }
-  .empty-state p { font-size: 12px; line-height: 1.7; }
+  .empty-state .big { font-size: 44px; margin-bottom: 16px; opacity: 0.18; }
+  .empty-state p { font-size: 14px; line-height: 1.8; color: var(--text-dim); }
 
   .export-btn {
     background: transparent;
-    border: 1px solid var(--border2);
+    border: 1.5px solid var(--border);
     color: var(--text-dim);
-    font-family: inherit;
-    font-size: 10px;
-    padding: 5px 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 14px;
     cursor: pointer;
-    letter-spacing: 0.08em;
-    transition: all 0.15s;
+    letter-spacing: 0.03em;
+    transition: all 0.18s;
+    border-radius: var(--radius-sm);
   }
-  .export-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .export-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(13,148,136,0.08); }
 
   .formula-box {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--accent2);
-    padding: 10px 14px;
-    font-size: 10px;
-    color: var(--text-dim);
-    line-height: 1.7;
+    background: var(--text);
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    font-size: 12px;
+    color: rgba(148,163,184,0.9);
+    line-height: 1.85;
     margin-bottom: 14px;
   }
-  .formula-box code { color: var(--accent); }
+  .formula-box code {
+    color: #5eead4;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+  }
 
   .legend {
     display: flex;
-    gap: 16px;
+    gap: 14px;
     flex-wrap: wrap;
-    margin-top: 10px;
+    margin-top: 12px;
   }
-  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-dim); }
-  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
-  .legend-line { width: 20px; height: 2px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-muted); }
+  .legend-dot { width: 7px; height: 7px; border-radius: 50%; }
+  .legend-line { width: 18px; height: 2px; border-radius: 2px; }
 
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
   .fade-in { animation: fadeIn 0.3s ease forwards; }
 
   /* Scrollbar */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: var(--bg); }
-  ::-webkit-scrollbar-thumb { background: var(--border2); }
-  ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 100px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+  /* ---- SVG LOGO CLASSES ---- */
+  .g0,.g1,.g2,.g3,.g4 { fill: none; stroke-linecap: round; stroke-width: 4px; }
+  .g0 { stroke: #5b4b8a; }
+  .g1 { stroke: #f15b4c; }
+  .g2 { stroke: #4c9b3a; }
+  .g3 { stroke: #f3c623; }
+  .g4 { stroke: #1f70b8; }
+  .g5 { fill: #414042; }
+
+  /* ---- SITE NAV ---- */
+  .site-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 48px;
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 99;
+    border-bottom: 1px solid var(--border);
+    height: 56px;
+  }
+  .nav-brand {
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+  }
+  .nav-brand svg {
+    height: 50px;
+    width: auto;
+    display: block;
+  }
+  .nav-links {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+  }
+  .nav-btn {
+    font-family: 'Jost', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    background: transparent;
+    border: none;
+    padding: 8px 16px;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: all 0.18s;
+  }
+  .nav-btn:hover { color: var(--text); background: var(--bg3); }
+  .nav-btn.active { color: var(--accent); background: rgba(13,148,136,0.09); }
+  .nav-github {
+    display: flex;
+    align-items: center;
+    color: var(--text-muted);
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
+    transition: color 0.18s, background 0.18s;
+    margin-left: 8px;
+    text-decoration: none;
+  }
+  .nav-github:hover { color: var(--text); background: var(--bg3); }
+  .nav-github svg { display: block; }
+
+  /* ---- HOME PAGE ---- */
+  .home-page {
+    display: none;
+    animation: fadeIn 0.4s ease forwards;
+  }
+  .home-page.visible { display: block; }
+
+  .home-hero {
+    min-height: calc(72vh - 56px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 64px 40px 48px;
+    border-bottom: 1px solid var(--border);
+  }
+  .home-hero .hero-logo svg {
+    height: 120px;
+    width: auto;
+    display: block;
+    margin: 0 auto 50px;
+  }
+  .home-hero h1 {
+    font-family: 'Jost', sans-serif;
+    font-size: 50px;
+    font-weight: 200;
+    color: var(--text);
+    letter-spacing: -0.025em;
+    margin-bottom: 16px;
+    line-height: 1.1;
+    max-width: 680px;
+  }
+  .home-hero p {
+    font-size: 16px;
+    color: var(--text-dim);
+    line-height: 1.75;
+    max-width: 520px;
+    margin: 0 auto 32px;
+  }
+  .home-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    border: none;
+    color: #fff;
+    font-family: 'Jost', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 14px 32px;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    box-shadow: 0 2px 12px rgba(13,148,136,0.3);
+    transition: all 0.2s;
+  }
+  .home-cta:hover {
+    background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
+    box-shadow: 0 4px 18px rgba(13,148,136,0.4);
+    transform: translateY(-2px);
+  }
+  .home-cta:active { transform: translateY(0); }
+
+  .home-features {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0;
+  }
+  .feature-card {
+    padding: 48px 40px;
+    border-right: 1px solid var(--border);
+    transition: background 0.18s;
+  }
+  .feature-card:last-child { border-right: none; }
+  .feature-card:hover { background: rgba(13,148,136,0.03); }
+  .feature-num {
+    font-family: 'Jost', sans-serif;
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+    margin-bottom: 6px;
+    line-height: 1;
+  }
+  .feature-label {
+    font-family: 'Jost', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+  }
+  .feature-card p {
+    font-size: 13.5px;
+    color: var(--text-dim);
+    line-height: 1.75;
+  }
+
+  /* ---- GUIDE PAGE ---- */
+  .guide-page {
+    display: none;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 60px 40px 100px;
+    animation: fadeIn 0.35s ease forwards;
+  }
+  .guide-page.visible { display: block; }
+
+  .guide-hero {
+    text-align: center;
+    padding-bottom: 48px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 48px;
+  }
+  .guide-hero .hero-logo svg {
+    height: 150px;
+    width: auto;
+    display: block;
+    margin: 0 auto 28px;
+  }
+  .guide-hero h1 {
+    font-family: 'Jost', sans-serif;
+    font-size: 30px;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: -0.02em;
+    margin-bottom: 12px;
+    line-height: 1.15;
+  }
+  .guide-hero p {
+    font-size: 15px;
+    color: var(--text-dim);
+    line-height: 1.75;
+    max-width: 520px;
+    margin: 0 auto 24px;
+  }
+  .guide-badge-row {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 28px;
+  }
+  .guide-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 4px 12px;
+    border-radius: 100px;
+    letter-spacing: 0.06em;
+    border: 1px solid var(--border2);
+    color: var(--text-dim);
+    background: var(--bg2);
+  }
+  .guide-badge.teal { color: var(--accent); background: rgba(13,148,136,0.07); border-color: rgba(13,148,136,0.25); }
+
+  .guide-cta-wrap {
+    margin-bottom: 48px;
+  }
+  .guide-cta-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    border: none;
+    color: #ffffff;
+    font-family: 'Jost', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 13px 28px;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    box-shadow: 0 2px 10px rgba(13,148,136,0.28);
+    transition: all 0.2s;
+  }
+  .guide-cta-btn:hover {
+    background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
+    box-shadow: 0 4px 16px rgba(13,148,136,0.38);
+    transform: translateY(-1px);
+  }
+  .guide-cta-btn:active { transform: translateY(0); box-shadow: none; }
+
+  .guide-section {
+    margin-bottom: 52px;
+  }
+  .guide-section-label {
+    font-family: 'Jost', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+  .guide-section h2 {
+    font-family: 'Jost', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.01em;
+    margin-bottom: 16px;
+    line-height: 1.25;
+  }
+  .guide-section p {
+    font-size: 14.5px;
+    color: var(--text-dim);
+    line-height: 1.8;
+    margin-bottom: 14px;
+  }
+  .guide-section p:last-child { margin-bottom: 0; }
+
+  .guide-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 52px 0;
+  }
+
+  /* Two-column grid */
+  .guide-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 20px;
+  }
+  @media (max-width: 640px) { .guide-grid { grid-template-columns: 1fr; } }
+
+  .guide-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .guide-card h3 {
+    font-family: 'Jost', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+  .guide-card p {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.7;
+    margin-bottom: 0 !important;
+  }
+
+  /* Steps */
+  .guide-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 20px;
+  }
+  .guide-step {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  .guide-step-num {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-family: 'Jost', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 1px;
+  }
+  .guide-step-body h4 {
+    font-family: 'Jost', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .guide-step-body p {
+    font-size: 13.5px;
+    color: var(--text-dim);
+    line-height: 1.7;
+    margin-bottom: 0 !important;
+  }
+
+  /* Code examples */
+  .guide-code {
+    background: var(--text);
+    border-radius: var(--radius-sm);
+    padding: 14px 18px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    color: #94a3b8;
+    line-height: 1.8;
+    margin-top: 12px;
+    overflow-x: auto;
+  }
+  .guide-code .c-teal { color: #5eead4; }
+  .guide-code .c-muted { color: #475569; }
+  .guide-code .c-yellow { color: #fcd34d; }
+  .guide-code .c-white { color: #f1f5f9; }
+
+  /* Callout */
+  .guide-callout {
+    background: rgba(13,148,136,0.05);
+    border: 1px solid rgba(13,148,136,0.2);
+    border-left: 3px solid var(--accent);
+    border-radius: var(--radius-sm);
+    padding: 14px 18px;
+    font-size: 13.5px;
+    color: var(--text-dim);
+    line-height: 1.75;
+    margin-top: 16px;
+  }
+  .guide-callout strong { color: var(--text); font-weight: 600; }
+
+  /* Regime pills row */
+  .regime-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .regime-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .regime-pill {
+    flex-shrink: 0;
+    font-family: 'Jost', sans-serif;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    padding: 3px 10px;
+    border-radius: 100px;
+    margin-top: 2px;
+  }
+  .regime-item p {
+    font-size: 13.5px;
+    color: var(--text-dim);
+    line-height: 1.65;
+    margin-bottom: 0 !important;
+  }
+
+  /* Citation box */
+  .guide-citation {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-top: 16px;
+  }
+  .guide-citation p {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.8;
+    margin-bottom: 0 !important;
+  }
+  .guide-citation .cite-title { color: var(--text); font-weight: 500; }
+  .guide-citation .cite-journal { color: var(--accent); }
 </style>
 </head>
 <body>
 
-<header class="header">
-  <div class="header-left">
-    <div class="logo"> 
-        <?xml version="1.0" encoding="UTF-8"?>
-      <svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 681 299">
-  <!-- Generator: Adobe Illustrator 29.8.4, SVG Export Plug-In . SVG Version: 2.1.1 Build 6)  -->
-  <defs>
-    <style>
-      .st0 {
-        stroke: #5b4b8a;
-      }
 
-      .st0, .st1, .st2, .st3, .st4 {
-        fill: none;
-        stroke-linecap: round;
-        stroke-width: 4px;
-      }
+<nav class="site-nav">
+  <div class="nav-brand" onclick="switchTab('home', document.querySelectorAll('.nav-btn')[0])">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 681 299">
+      <path class="g0" d="M232,178.1c18.3,0,36.6-5.4,50.4-16.3,22.9-21.7,32.1-54.3,41.2-76,13.7-32.6,36.6-51.6,73.3-59.7,27.5-5.4,55-8.1,91.6-8.1"/>
+      <path class="g4" d="M268.6,178.1c18.3,0,36.6-5.4,50.4-16.3,22.9-21.7,32.1-54.3,41.2-76,13.7-32.6,36.6-51.6,73.3-59.7,27.5-5.4,55-8.1,91.6-8.1"/>
+      <path class="g2" d="M305.3,178.1c18.3,0,36.6-5.4,50.4-16.3,22.9-21.7,32.1-54.3,41.2-76,13.7-32.6,36.6-51.6,73.3-59.7,27.5-5.4,55-8.1,91.6-8.1"/>
+      <path class="g3" d="M341.9,178.1c18.3,0,36.6-5.4,50.4-16.3,22.9-21.7,32.1-54.3,41.2-76,13.7-32.6,36.6-51.6,73.3-59.7,27.5-5.4,55-8.1,91.6-8.1"/>
+      <path class="g1" d="M378.6,178.1c18.3,0,36.6-5.4,50.4-16.3,22.9-21.7,32.1-54.3,41.2-76,13.7-32.6,36.6-51.6,73.3-59.7,27.5-5.4,55-8.1,91.6-8.1"/>
+      <path class="g5" d="M123.4,243.8c-1.9,2.9-4.2,5.6-6.9,8.1s-5.9,4.8-9.4,6.8c-3.6,1.9-7.5,3.5-11.8,4.6-4.3,1.1-9,1.7-14.1,1.7-8.5,0-16.4-1.5-23.6-4.5-7.2-3-13.5-7.1-18.7-12.4-5.2-5.3-9.3-11.5-12.2-18.8-2.9-7.2-4.4-15.2-4.4-23.8s1.5-16.5,4.5-23.8c3-7.2,7.1-13.5,12.4-18.8s11.5-9.4,18.7-12.4c7.2-3,15-4.5,23.4-4.5s8.2.4,12.2,1.3c4,.9,7.7,2.1,11.3,3.6,3.5,1.6,6.7,3.5,9.6,5.6,2.9,2.2,5.3,4.7,7.2,7.4l-9.6,7c-1.2-1.8-2.7-3.6-4.7-5.4-2-1.8-4.3-3.4-6.9-4.8-2.7-1.4-5.6-2.5-8.7-3.4-3.1-.9-6.5-1.3-10.1-1.3-7.3,0-13.9,1.3-19.7,4-5.8,2.7-10.7,6.2-14.8,10.7-4,4.5-7.1,9.7-9.3,15.7-2.1,5.9-3.2,12.2-3.2,18.8s1.1,12.8,3.3,18.8c2.2,5.9,5.3,11.2,9.3,15.7,4,4.5,9,8.1,14.8,10.7,5.8,2.7,12.3,4,19.6,4s12.7-1.3,18.5-4c5.9-2.7,10.7-6.9,14.7-12.8l8.9,5.7Z"/>
+      <path class="g5" d="M178.4,262.1h-11.5v-102.8h-37.8v-10.2h87.2v10.2h-37.8v102.8Z"/>
+      <path class="g5" d="M301.7,222.8c0,5.6-1,10.9-3,15.6-2,4.8-4.7,8.9-8.2,12.5s-7.7,6.3-12.6,8.2c-4.9,2-10.3,3-16.1,3s-11.1-1-16-3c-4.9-2-9.1-4.7-12.6-8.2-3.5-3.5-6.3-7.7-8.2-12.5-2-4.8-3-10-3-15.6s1-10.9,3-15.6c2-4.8,4.7-8.9,8.2-12.5,3.5-3.5,7.7-6.3,12.6-8.2,4.9-2,10.2-3,16-3s11.2,1,16.1,3c4.9,2,9.1,4.7,12.6,8.2s6.3,7.7,8.2,12.5c2,4.8,3,10,3,15.6ZM290.2,222.8c0-4.2-.7-8.1-2-11.7-1.3-3.7-3.2-6.9-5.7-9.6-2.4-2.7-5.4-4.9-8.9-6.5s-7.5-2.4-11.8-2.4-8.3.8-11.7,2.4c-3.5,1.6-6.4,3.8-8.9,6.5-2.4,2.7-4.3,5.9-5.7,9.6-1.3,3.7-2,7.6-2,11.7s.7,8.1,2,11.7c1.3,3.7,3.2,6.9,5.7,9.6,2.4,2.7,5.4,4.8,8.9,6.4,3.5,1.5,7.4,2.3,11.7,2.3s8.3-.8,11.8-2.3c3.5-1.5,6.5-3.7,8.9-6.4,2.4-2.7,4.3-5.9,5.7-9.6,1.3-3.7,2-7.6,2-11.7Z"/>
+      <path class="g5" d="M345.5,187.6c4.4-2.7,9.3-4.1,14.8-4.1s4.1.2,6.3.6c2.2.4,4.3,1.3,6.4,2.5,2.1,1.2,4,2.8,5.7,4.9,1.8,2,3.3,4.6,4.6,7.8,2.6-5.1,6-9,10.5-11.7,4.4-2.7,9.7-4.1,15.7-4.1,9.5,0,16.6,2.8,21.3,8.5,4.7,5.6,7.1,13.1,7.1,22.4v45.8h-10.9v-41.3c0-7.9-1.5-14.2-4.4-19-2.9-4.8-7.9-7.2-14.9-7.2s-7.3.8-10,2.4-4.9,3.7-6.5,6.3c-1.7,2.6-2.8,5.6-3.6,8.9-.7,3.3-1.1,6.7-1.1,10.2v39.8h-10.9v-43.6c0-3.6-.3-6.9-.8-9.9-.5-3-1.5-5.5-2.8-7.6-1.3-2.1-3.2-3.7-5.5-4.8-2.3-1.1-5.3-1.7-8.9-1.7s-5.1.6-7.7,1.8c-2.6,1.2-4.9,3-7,5.3-2.1,2.4-3.8,5.4-5,9.1s-1.9,8-1.9,13v38.3h-10.9v-58.3c0-2,0-4.6-.2-7.8-.1-3.2-.3-6.1-.5-8.6h10.4c.2,2,.4,4.3.5,6.7.1,2.5.2,4.5.2,6.1h.3c2.1-4.4,5.4-7.9,9.8-10.6Z"/>
+      <path class="g5" d="M479.2,156.7c0,2.2-.8,4.1-2.4,5.5-1.6,1.4-3.4,2.2-5.3,2.2s-3.7-.7-5.3-2.2c-1.6-1.4-2.4-3.3-2.4-5.5s.8-4.1,2.4-5.5c1.6-1.4,3.4-2.2,5.3-2.2s3.7.7,5.3,2.2,2.4,3.3,2.4,5.5ZM477,260.2h-10.9v-74.7h10.9v74.7Z"/>
+      <path class="g5" d="M559.7,202.6c-1.8-2.9-4.4-5.2-7.9-7.1-3.5-1.9-7.2-2.8-11.3-2.8s-8.3.8-11.8,2.3c-3.5,1.5-6.5,3.7-9,6.4-2.5,2.7-4.4,5.9-5.7,9.6-1.3,3.7-2,7.6-2,11.9s.7,8.2,2,11.8c1.3,3.6,3.2,6.8,5.7,9.5,2.4,2.7,5.4,4.8,8.9,6.4,3.5,1.5,7.4,2.3,11.8,2.3s8.8-.9,12.1-2.7c3.3-1.8,6-4.2,8.1-7l8.1,6.1c-3.2,3.9-7.1,7.1-11.7,9.4s-10.2,3.5-16.7,3.5-11.5-1-16.4-3c-4.9-2-9.1-4.7-12.5-8.2-3.5-3.5-6.1-7.7-8.1-12.5-1.9-4.8-2.9-10-2.9-15.6s1-10.9,2.9-15.6c1.9-4.8,4.6-8.9,8.1-12.5,3.5-3.5,7.6-6.3,12.5-8.2,4.9-2,10.4-3,16.4-3s10.1,1.1,15.2,3.3c5.2,2.2,9.3,5.4,12.5,9.7l-8.5,6.1Z"/>
+      <path class="g5" d="M625.5,203.2c-1.6-3.1-4-5.6-7.3-7.6-3.2-2-6.9-3-11.1-3s-3.8.2-5.7.6c-1.9.4-3.6,1.1-5.1,2.1-1.5,1-2.7,2.2-3.6,3.7-.9,1.5-1.4,3.2-1.4,5.3,0,3.5,1.4,6.2,4.3,8.1,2.9,1.9,7.4,3.4,13.6,4.7,8.8,1.8,15.4,4.4,19.6,7.9,4.2,3.5,6.3,8.1,6.3,14s-.8,7.9-2.5,10.8c-1.7,2.9-3.8,5.3-6.5,7.2-2.7,1.9-5.7,3.2-9,4-3.4.8-6.7,1.2-10.1,1.2-5.6,0-11.1-1.2-16.4-3.5-5.3-2.3-9.7-6-13.1-11l8.6-6.4c1.9,3.3,4.7,6.1,8.5,8.3,3.7,2.2,7.8,3.4,12.3,3.4s4.6-.2,6.7-.6c2.1-.4,4-1.2,5.6-2.2,1.6-1.1,2.9-2.4,3.8-4.1,1-1.6,1.4-3.7,1.4-6.1,0-3.9-1.9-6.9-5.7-8.9-3.8-2-9.2-3.8-16.4-5.5-2.2-.5-4.6-1.2-7.1-2-2.5-.8-4.8-2-6.9-3.5-2.1-1.5-3.9-3.5-5.3-5.8-1.4-2.3-2.1-5.3-2.1-8.8s.7-7.1,2.2-9.8c1.5-2.7,3.5-4.9,6-6.7,2.5-1.8,5.3-3.1,8.5-3.9,3.2-.9,6.5-1.3,9.9-1.3,5.2,0,10.3,1.2,15.2,3.5,4.9,2.3,8.6,5.6,11,9.9l-8.3,6.2Z"/>
+    </svg>
+  </div>
+  <div class="nav-links">
+    <button class="nav-btn active" onclick="switchTab('home', this)">Home</button>
+    <button class="nav-btn" onclick="switchTab('about', this)">About CTomics</button>
+    <button class="nav-btn" onclick="switchTab('models', this)">Models</button>
+    <a class="nav-github" href="https://github.com/lvelosuarez/CTomics" target="_blank" rel="noopener" title="View on GitHub">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0 1 12 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+      </svg>
+    </a>
+  </div>
+</nav>
 
-      .st5 {
-        fill: #414042;
-      }
+<!-- HOME TAB -->
+<div id="tab-home" class="home-page visible">
 
-      .st1 {
-        stroke: #f15b4c;
-      }
-
-      .st2 {
-        stroke: #4c9b3a;
-      }
-
-      .st3 {
-        stroke: #f3c623;
-      }
-
-      .st4 {
-        stroke: #1f70b8;
-      }
-    </style>
-  </defs>
-  <path class="st0" d="M232,178.1c18.3,0,36.6-5.4,50.4-16.3,22.9-21.7,32.1-54.3,41.2-76,13.7-32.6,36.6-51.6,73.3-59.7,27.5-5.4,55-8.1,91.6-8.1"/>
-  <path class="st4" d="M268.6,178.1c18.3,0,36.6-5.4,50.4-16.3,22.9-21.7,32.1-54.3,41.2-76,13.7-32.6,36.6-51.6,73.3-59.7,27.5-5.4,55-8.1,91.6-8.1"/>
-  <path class="st2" d="M305.3,178.1c18.3,0,36.6-5.4,50.4-16.3,22.9-21.7,32.1-54.3,41.2-76,13.7-32.6,36.6-51.6,73.3-59.7,27.5-5.4,55-8.1,91.6-8.1"/>
-  <path class="st3" d="M341.9,178.1c18.3,0,36.6-5.4,50.4-16.3,22.9-21.7,32.1-54.3,41.2-76,13.7-32.6,36.6-51.6,73.3-59.7,27.5-5.4,55-8.1,91.6-8.1"/>
-  <path class="st1" d="M378.6,178.1c18.3,0,36.6-5.4,50.4-16.3,22.9-21.7,32.1-54.3,41.2-76,13.7-32.6,36.6-51.6,73.3-59.7,27.5-5.4,55-8.1,91.6-8.1"/>
-  <path class="st5" d="M123.4,243.8c-1.9,2.9-4.2,5.6-6.9,8.1s-5.9,4.8-9.4,6.8c-3.6,1.9-7.5,3.5-11.8,4.6-4.3,1.1-9,1.7-14.1,1.7-8.5,0-16.4-1.5-23.6-4.5-7.2-3-13.5-7.1-18.7-12.4-5.2-5.3-9.3-11.5-12.2-18.8-2.9-7.2-4.4-15.2-4.4-23.8s1.5-16.5,4.5-23.8c3-7.2,7.1-13.5,12.4-18.8s11.5-9.4,18.7-12.4c7.2-3,15-4.5,23.4-4.5s8.2.4,12.2,1.3c4,.9,7.7,2.1,11.3,3.6,3.5,1.6,6.7,3.5,9.6,5.6,2.9,2.2,5.3,4.7,7.2,7.4l-9.6,7c-1.2-1.8-2.7-3.6-4.7-5.4-2-1.8-4.3-3.4-6.9-4.8-2.7-1.4-5.6-2.5-8.7-3.4-3.1-.9-6.5-1.3-10.1-1.3-7.3,0-13.9,1.3-19.7,4-5.8,2.7-10.7,6.2-14.8,10.7-4,4.5-7.1,9.7-9.3,15.7-2.1,5.9-3.2,12.2-3.2,18.8s1.1,12.8,3.3,18.8c2.2,5.9,5.3,11.2,9.3,15.7,4,4.5,9,8.1,14.8,10.7,5.8,2.7,12.3,4,19.6,4s12.7-1.3,18.5-4c5.9-2.7,10.7-6.9,14.7-12.8l8.9,5.7Z"/>
-  <path class="st5" d="M178.4,262.1h-11.5v-102.8h-37.8v-10.2h87.2v10.2h-37.8v102.8Z"/>
-  <path class="st5" d="M301.7,222.8c0,5.6-1,10.9-3,15.6-2,4.8-4.7,8.9-8.2,12.5s-7.7,6.3-12.6,8.2c-4.9,2-10.3,3-16.1,3s-11.1-1-16-3c-4.9-2-9.1-4.7-12.6-8.2-3.5-3.5-6.3-7.7-8.2-12.5-2-4.8-3-10-3-15.6s1-10.9,3-15.6c2-4.8,4.7-8.9,8.2-12.5,3.5-3.5,7.7-6.3,12.6-8.2,4.9-2,10.2-3,16-3s11.2,1,16.1,3c4.9,2,9.1,4.7,12.6,8.2s6.3,7.7,8.2,12.5c2,4.8,3,10,3,15.6ZM290.2,222.8c0-4.2-.7-8.1-2-11.7-1.3-3.7-3.2-6.9-5.7-9.6-2.4-2.7-5.4-4.9-8.9-6.5s-7.5-2.4-11.8-2.4-8.3.8-11.7,2.4c-3.5,1.6-6.4,3.8-8.9,6.5-2.4,2.7-4.3,5.9-5.7,9.6-1.3,3.7-2,7.6-2,11.7s.7,8.1,2,11.7c1.3,3.7,3.2,6.9,5.7,9.6,2.4,2.7,5.4,4.8,8.9,6.4,3.5,1.5,7.4,2.3,11.7,2.3s8.3-.8,11.8-2.3c3.5-1.5,6.5-3.7,8.9-6.4,2.4-2.7,4.3-5.9,5.7-9.6,1.3-3.7,2-7.6,2-11.7Z"/>
-  <path class="st5" d="M345.5,187.6c4.4-2.7,9.3-4.1,14.8-4.1s4.1.2,6.3.6c2.2.4,4.3,1.3,6.4,2.5,2.1,1.2,4,2.8,5.7,4.9,1.8,2,3.3,4.6,4.6,7.8,2.6-5.1,6-9,10.5-11.7,4.4-2.7,9.7-4.1,15.7-4.1,9.5,0,16.6,2.8,21.3,8.5,4.7,5.6,7.1,13.1,7.1,22.4v45.8h-10.9v-41.3c0-7.9-1.5-14.2-4.4-19-2.9-4.8-7.9-7.2-14.9-7.2s-7.3.8-10,2.4-4.9,3.7-6.5,6.3c-1.7,2.6-2.8,5.6-3.6,8.9-.7,3.3-1.1,6.7-1.1,10.2v39.8h-10.9v-43.6c0-3.6-.3-6.9-.8-9.9-.5-3-1.5-5.5-2.8-7.6-1.3-2.1-3.2-3.7-5.5-4.8-2.3-1.1-5.3-1.7-8.9-1.7s-5.1.6-7.7,1.8c-2.6,1.2-4.9,3-7,5.3-2.1,2.4-3.8,5.4-5,9.1s-1.9,8-1.9,13v38.3h-10.9v-58.3c0-2,0-4.6-.2-7.8-.1-3.2-.3-6.1-.5-8.6h10.4c.2,2,.4,4.3.5,6.7.1,2.5.2,4.5.2,6.1h.3c2.1-4.4,5.4-7.9,9.8-10.6Z"/>
-  <path class="st5" d="M479.2,156.7c0,2.2-.8,4.1-2.4,5.5-1.6,1.4-3.4,2.2-5.3,2.2s-3.7-.7-5.3-2.2c-1.6-1.4-2.4-3.3-2.4-5.5s.8-4.1,2.4-5.5c1.6-1.4,3.4-2.2,5.3-2.2s3.7.7,5.3,2.2,2.4,3.3,2.4,5.5ZM477,260.2h-10.9v-74.7h10.9v74.7Z"/>
-  <path class="st5" d="M559.7,202.6c-1.8-2.9-4.4-5.2-7.9-7.1-3.5-1.9-7.2-2.8-11.3-2.8s-8.3.8-11.8,2.3c-3.5,1.5-6.5,3.7-9,6.4-2.5,2.7-4.4,5.9-5.7,9.6-1.3,3.7-2,7.6-2,11.9s.7,8.2,2,11.8c1.3,3.6,3.2,6.8,5.7,9.5,2.4,2.7,5.4,4.8,8.9,6.4,3.5,1.5,7.4,2.3,11.8,2.3s8.8-.9,12.1-2.7c3.3-1.8,6-4.2,8.1-7l8.1,6.1c-3.2,3.9-7.1,7.1-11.7,9.4s-10.2,3.5-16.7,3.5-11.5-1-16.4-3c-4.9-2-9.1-4.7-12.5-8.2-3.5-3.5-6.1-7.7-8.1-12.5-1.9-4.8-2.9-10-2.9-15.6s1-10.9,2.9-15.6c1.9-4.8,4.6-8.9,8.1-12.5,3.5-3.5,7.6-6.3,12.5-8.2,4.9-2,10.4-3,16.4-3s10.1,1.1,15.2,3.3c5.2,2.2,9.3,5.4,12.5,9.7l-8.5,6.1Z"/>
-  <path class="st5" d="M625.5,203.2c-1.6-3.1-4-5.6-7.3-7.6-3.2-2-6.9-3-11.1-3s-3.8.2-5.7.6c-1.9.4-3.6,1.1-5.1,2.1-1.5,1-2.7,2.2-3.6,3.7-.9,1.5-1.4,3.2-1.4,5.3,0,3.5,1.4,6.2,4.3,8.1,2.9,1.9,7.4,3.4,13.6,4.7,8.8,1.8,15.4,4.4,19.6,7.9,4.2,3.5,6.3,8.1,6.3,14s-.8,7.9-2.5,10.8c-1.7,2.9-3.8,5.3-6.5,7.2-2.7,1.9-5.7,3.2-9,4-3.4.8-6.7,1.2-10.1,1.2-5.6,0-11.1-1.2-16.4-3.5-5.3-2.3-9.7-6-13.1-11l8.6-6.4c1.9,3.3,4.7,6.1,8.5,8.3,3.7,2.2,7.8,3.4,12.3,3.4s4.6-.2,6.7-.6c2.1-.4,4-1.2,5.6-2.2,1.6-1.1,2.9-2.4,3.8-4.1,1-1.6,1.4-3.7,1.4-6.1,0-3.9-1.9-6.9-5.7-8.9-3.8-2-9.2-3.8-16.4-5.5-2.2-.5-4.6-1.2-7.1-2-2.5-.8-4.8-2-6.9-3.5-2.1-1.5-3.9-3.5-5.3-5.8-1.4-2.3-2.1-5.3-2.1-8.8s.7-7.1,2.2-9.8c1.5-2.7,3.5-4.9,6-6.7,2.5-1.8,5.3-3.1,8.5-3.9,3.2-.9,6.5-1.3,9.9-1.3,5.2,0,10.3,1.2,15.2,3.5,4.9,2.3,8.6,5.6,11,9.9l-8.3,6.2Z"/>
-</svg>
+  <div class="home-hero">
+    <div class="hero-logo">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 681 299">
+        <path class="g0" d="M232,178.1c18.3,0,36.6-5.4,50.4-16.3,22.9-21.7,32.1-54.3,41.2-76,13.7-32.6,36.6-51.6,73.3-59.7,27.5-5.4,55-8.1,91.6-8.1"/>
+        <path class="g4" d="M268.6,178.1c18.3,0,36.6-5.4,50.4-16.3,22.9-21.7,32.1-54.3,41.2-76,13.7-32.6,36.6-51.6,73.3-59.7,27.5-5.4,55-8.1,91.6-8.1"/>
+        <path class="g2" d="M305.3,178.1c18.3,0,36.6-5.4,50.4-16.3,22.9-21.7,32.1-54.3,41.2-76,13.7-32.6,36.6-51.6,73.3-59.7,27.5-5.4,55-8.1,91.6-8.1"/>
+        <path class="g3" d="M341.9,178.1c18.3,0,36.6-5.4,50.4-16.3,22.9-21.7,32.1-54.3,41.2-76,13.7-32.6,36.6-51.6,73.3-59.7,27.5-5.4,55-8.1,91.6-8.1"/>
+        <path class="g1" d="M378.6,178.1c18.3,0,36.6-5.4,50.4-16.3,22.9-21.7,32.1-54.3,41.2-76,13.7-32.6,36.6-51.6,73.3-59.7,27.5-5.4,55-8.1,91.6-8.1"/>
+        <path class="g5" d="M123.4,243.8c-1.9,2.9-4.2,5.6-6.9,8.1s-5.9,4.8-9.4,6.8c-3.6,1.9-7.5,3.5-11.8,4.6-4.3,1.1-9,1.7-14.1,1.7-8.5,0-16.4-1.5-23.6-4.5-7.2-3-13.5-7.1-18.7-12.4-5.2-5.3-9.3-11.5-12.2-18.8-2.9-7.2-4.4-15.2-4.4-23.8s1.5-16.5,4.5-23.8c3-7.2,7.1-13.5,12.4-18.8s11.5-9.4,18.7-12.4c7.2-3,15-4.5,23.4-4.5s8.2.4,12.2,1.3c4,.9,7.7,2.1,11.3,3.6,3.5,1.6,6.7,3.5,9.6,5.6,2.9,2.2,5.3,4.7,7.2,7.4l-9.6,7c-1.2-1.8-2.7-3.6-4.7-5.4-2-1.8-4.3-3.4-6.9-4.8-2.7-1.4-5.6-2.5-8.7-3.4-3.1-.9-6.5-1.3-10.1-1.3-7.3,0-13.9,1.3-19.7,4-5.8,2.7-10.7,6.2-14.8,10.7-4,4.5-7.1,9.7-9.3,15.7-2.1,5.9-3.2,12.2-3.2,18.8s1.1,12.8,3.3,18.8c2.2,5.9,5.3,11.2,9.3,15.7,4,4.5,9,8.1,14.8,10.7,5.8,2.7,12.3,4,19.6,4s12.7-1.3,18.5-4c5.9-2.7,10.7-6.9,14.7-12.8l8.9,5.7Z"/>
+        <path class="g5" d="M178.4,262.1h-11.5v-102.8h-37.8v-10.2h87.2v10.2h-37.8v102.8Z"/>
+        <path class="g5" d="M301.7,222.8c0,5.6-1,10.9-3,15.6-2,4.8-4.7,8.9-8.2,12.5s-7.7,6.3-12.6,8.2c-4.9,2-10.3,3-16.1,3s-11.1-1-16-3c-4.9-2-9.1-4.7-12.6-8.2-3.5-3.5-6.3-7.7-8.2-12.5-2-4.8-3-10-3-15.6s1-10.9,3-15.6c2-4.8,4.7-8.9,8.2-12.5,3.5-3.5,7.7-6.3,12.6-8.2,4.9-2,10.2-3,16-3s11.2,1,16.1,3c4.9,2,9.1,4.7,12.6,8.2s6.3,7.7,8.2,12.5c2,4.8,3,10,3,15.6ZM290.2,222.8c0-4.2-.7-8.1-2-11.7-1.3-3.7-3.2-6.9-5.7-9.6-2.4-2.7-5.4-4.9-8.9-6.5s-7.5-2.4-11.8-2.4-8.3.8-11.7,2.4c-3.5,1.6-6.4,3.8-8.9,6.5-2.4,2.7-4.3,5.9-5.7,9.6-1.3,3.7-2,7.6-2,11.7s.7,8.1,2,11.7c1.3,3.7,3.2,6.9,5.7,9.6,2.4,2.7,5.4,4.8,8.9,6.4,3.5,1.5,7.4,2.3,11.7,2.3s8.3-.8,11.8-2.3c3.5-1.5,6.5-3.7,8.9-6.4,2.4-2.7,4.3-5.9,5.7-9.6,1.3-3.7,2-7.6,2-11.7Z"/>
+        <path class="g5" d="M345.5,187.6c4.4-2.7,9.3-4.1,14.8-4.1s4.1.2,6.3.6c2.2.4,4.3,1.3,6.4,2.5,2.1,1.2,4,2.8,5.7,4.9,1.8,2,3.3,4.6,4.6,7.8,2.6-5.1,6-9,10.5-11.7,4.4-2.7,9.7-4.1,15.7-4.1,9.5,0,16.6,2.8,21.3,8.5,4.7,5.6,7.1,13.1,7.1,22.4v45.8h-10.9v-41.3c0-7.9-1.5-14.2-4.4-19-2.9-4.8-7.9-7.2-14.9-7.2s-7.3.8-10,2.4-4.9,3.7-6.5,6.3c-1.7,2.6-2.8,5.6-3.6,8.9-.7,3.3-1.1,6.7-1.1,10.2v39.8h-10.9v-43.6c0-3.6-.3-6.9-.8-9.9-.5-3-1.5-5.5-2.8-7.6-1.3-2.1-3.2-3.7-5.5-4.8-2.3-1.1-5.3-1.7-8.9-1.7s-5.1.6-7.7,1.8c-2.6,1.2-4.9,3-7,5.3-2.1,2.4-3.8,5.4-5,9.1s-1.9,8-1.9,13v38.3h-10.9v-58.3c0-2,0-4.6-.2-7.8-.1-3.2-.3-6.1-.5-8.6h10.4c.2,2,.4,4.3.5,6.7.1,2.5.2,4.5.2,6.1h.3c2.1-4.4,5.4-7.9,9.8-10.6Z"/>
+        <path class="g5" d="M479.2,156.7c0,2.2-.8,4.1-2.4,5.5-1.6,1.4-3.4,2.2-5.3,2.2s-3.7-.7-5.3-2.2c-1.6-1.4-2.4-3.3-2.4-5.5s.8-4.1,2.4-5.5c1.6-1.4,3.4-2.2,5.3-2.2s3.7.7,5.3,2.2,2.4,3.3,2.4,5.5ZM477,260.2h-10.9v-74.7h10.9v74.7Z"/>
+        <path class="g5" d="M559.7,202.6c-1.8-2.9-4.4-5.2-7.9-7.1-3.5-1.9-7.2-2.8-11.3-2.8s-8.3.8-11.8,2.3c-3.5,1.5-6.5,3.7-9,6.4-2.5,2.7-4.4,5.9-5.7,9.6-1.3,3.7-2,7.6-2,11.9s.7,8.2,2,11.8c1.3,3.6,3.2,6.8,5.7,9.5,2.4,2.7,5.4,4.8,8.9,6.4,3.5,1.5,7.4,2.3,11.8,2.3s8.8-.9,12.1-2.7c3.3-1.8,6-4.2,8.1-7l8.1,6.1c-3.2,3.9-7.1,7.1-11.7,9.4s-10.2,3.5-16.7,3.5-11.5-1-16.4-3c-4.9-2-9.1-4.7-12.5-8.2-3.5-3.5-6.1-7.7-8.1-12.5-1.9-4.8-2.9-10-2.9-15.6s1-10.9,2.9-15.6c1.9-4.8,4.6-8.9,8.1-12.5,3.5-3.5,7.6-6.3,12.5-8.2,4.9-2,10.4-3,16.4-3s10.1,1.1,15.2,3.3c5.2,2.2,9.3,5.4,12.5,9.7l-8.5,6.1Z"/>
+        <path class="g5" d="M625.5,203.2c-1.6-3.1-4-5.6-7.3-7.6-3.2-2-6.9-3-11.1-3s-3.8.2-5.7.6c-1.9.4-3.6,1.1-5.1,2.1-1.5,1-2.7,2.2-3.6,3.7-.9,1.5-1.4,3.2-1.4,5.3,0,3.5,1.4,6.2,4.3,8.1,2.9,1.9,7.4,3.4,13.6,4.7,8.8,1.8,15.4,4.4,19.6,7.9,4.2,3.5,6.3,8.1,6.3,14s-.8,7.9-2.5,10.8c-1.7,2.9-3.8,5.3-6.5,7.2-2.7,1.9-5.7,3.2-9,4-3.4.8-6.7,1.2-10.1,1.2-5.6,0-11.1-1.2-16.4-3.5-5.3-2.3-9.7-6-13.1-11l8.6-6.4c1.9,3.3,4.7,6.1,8.5,8.3,3.7,2.2,7.8,3.4,12.3,3.4s4.6-.2,6.7-.6c2.1-.4,4-1.2,5.6-2.2,1.6-1.1,2.9-2.4,3.8-4.1,1-1.6,1.4-3.7,1.4-6.1,0-3.9-1.9-6.9-5.7-8.9-3.8-2-9.2-3.8-16.4-5.5-2.2-.5-4.6-1.2-7.1-2-2.5-.8-4.8-2-6.9-3.5-2.1-1.5-3.9-3.5-5.3-5.8-1.4-2.3-2.1-5.3-2.1-8.8s.7-7.1,2.2-9.8c1.5-2.7,3.5-4.9,6-6.7,2.5-1.8,5.3-3.1,8.5-3.9,3.2-.9,6.5-1.3,9.9-1.3,5.2,0,10.3,1.2,15.2,3.5,4.9,2.3,8.6,5.6,11,9.9l-8.3,6.2Z"/>
+      </svg>
     </div>
-    <span style="font-size:15px;color:var(--text-dim)">Microbial Read Fraction Predictor</span>
+    <h1>Microbial Read Fraction Predictor</h1>
+    <p>Estimate the percentage of microbial reads in a metagenomic sample from a simple dual-target qPCR assay.</p>
+    <button class="home-cta" onclick="switchTab('models', document.querySelectorAll('.nav-btn')[2])">
+      Open the Predictor &nbsp;→
+    </button>
   </div>
-  <div class="header-right">
-    Cho et al. 2021 · mSystems 6:e00552-21<br>
-    Extended for low-ΔCt / BAL regime
-  </div>
-</header>
 
+  <div class="home-features">
+    <div class="feature-card">
+      <div class="feature-num">01</div>
+      <div class="feature-label">qPCR-based</div>
+      <p>Predict the microbial read fraction from a single dual-target qPCR measurement.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-num">02</div>
+      <div class="feature-label">Validated model</div>
+      <p>Based on the sigmoid model by Cho et al. (mSystems 2021), validated on 75 clinical samples with R²=0.990.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-num">03</div>
+      <div class="feature-label">Open source</div>
+      <p>Open source tool for clinical and environmental metagenomics research. Export results as CSV.</p>
+    </div>
+  </div>
+
+</div><!-- /tab-home -->
+
+<div id="tab-models" style="display:none">
 <div class="main">
 
   <!-- LEFT PANEL -->
@@ -482,16 +957,8 @@
       <div class="section-title">Prediction Model</div>
       <div class="model-grid">
         <button class="model-btn active" data-model="cho" onclick="selectModel(this)">
-          <span>Cho Model E <span style="color:var(--text-muted);font-size:9px">(sigmoid)</span></span>
+          <span>Cho Model E <span style="color:var(--text-muted);font-size:11px;font-family:'JetBrains Mono',monospace">(sigmoid)</span></span>
           <span class="badge">R²=0.990</span>
-        </button>
-        <button class="model-btn" data-model="linear" onclick="selectModel(this)">
-          <span>Linear (logit-transformed)</span>
-          <span class="badge">MODELS C/D</span>
-        </button>
-        <button class="model-btn" data-model="ensemble" onclick="selectModel(this)">
-          <span>Ensemble + CI</span>
-          <span class="badge">EXPERIMENTAL</span>
         </button>
       </div>
     </div>
@@ -586,11 +1053,11 @@ or: sample_id, delta_ct"></textarea>
       <div class="chart-title">
         Sigmoidal Model Curve — Sample Positions
         <span style="flex:1"></span>
-        <span style="font-size:9px;color:var(--text-muted)">hover for details</span>
+        <span style="font-size:10px;color:var(--text-muted);font-family:'JetBrains Mono',monospace">hover for details</span>
       </div>
       <canvas id="chart"></canvas>
       <div class="legend" id="legend">
-        <div class="legend-item"><div class="legend-line" style="background:var(--accent)"></div> Cho Model E</div>
+        <div class="legend-item"><div class="legend-line" style="background:#0d9488"></div> Cho Model E</div>
         <div class="legend-item"><div class="legend-dot" style="background:var(--warn)"></div> 4% lower threshold</div>
         <div class="legend-item"><div class="legend-dot" style="background:var(--danger)"></div> &lt;4% (low-ΔCt regime)</div>
         <div class="legend-item"><div class="legend-dot" style="background:var(--success)"></div> 4–98% (valid range)</div>
@@ -608,6 +1075,185 @@ or: sample_id, delta_ct"></textarea>
 
   </div>
 </div>
+</div><!-- /tab-models -->
+
+<!-- ABOUT TAB -->
+<div id="tab-about" class="guide-page">
+
+  <!-- CTA -->
+  <div class="guide-cta-wrap">
+    <button class="guide-cta-btn" onclick="switchTab('models', document.querySelectorAll('.nav-btn')[2])">
+      Open the Predictor &nbsp;→
+    </button>
+  </div>
+
+  <!-- What is CTomics -->
+  <div class="guide-section">
+    <div class="guide-section-label">Overview</div>
+    <h2>What is CTomics?</h2>
+    <p>
+      Clinical and environmental metagenomics samples often contain a mix of host DNA and microbial DNA. Before committing to deep sequencing, it is useful to know what fraction of reads will be microbial — this determines how much sequencing you actually need to reach a target number of microbial reads.
+    </p>
+    <p>
+      CTomics implements the predictive model published by Cho et al. (2021) that links a simple, inexpensive dual-target qPCR result to the percentage of microbial reads in the final sequencing library. No sequencing is needed to obtain the prediction.
+    </p>
+  </div>
+
+  <hr class="guide-divider">
+
+  <!-- The Science -->
+  <div class="guide-section">
+    <div class="guide-section-label">The Science</div>
+    <h2>How does the ΔCt model work?</h2>
+    <p>
+      The assay measures two qPCR targets on the same DNA extract: the <strong>16S rRNA gene</strong> (universal bacterial marker) and <strong>ACTB</strong> (human housekeeping gene). Their difference defines the delta Ct:
+    </p>
+    <div class="guide-code">
+      <span class="c-teal">ΔCt</span> = Ct<span class="c-yellow">_ACTB</span> − Ct<span class="c-yellow">_16S</span>
+    </div>
+    <p style="margin-top:14px">
+      A <strong>high ΔCt</strong> means ACTB amplifies late (little host) and 16S amplifies early (lots of bacteria) — the sample is highly microbial. A <strong>low or negative ΔCt</strong> indicates host-dominated DNA.
+    </p>
+    <p>
+      Cho et al. fitted a four-parameter sigmoid curve to 75 clinical samples across a wide range of microbial fractions, achieving R²=0.990. The fitted equation is:
+    </p>
+    <div class="guide-code">
+      <span class="c-teal">% microbial</span> = <span class="c-white">2.7201549</span> /
+      <span class="c-muted"> (</span><span class="c-white">99.50267</span> × e<span class="c-white">^(−0.7218 × ΔCt)</span> + <span class="c-white">0.02733</span><span class="c-muted">)</span>
+    </div>
+    <div class="guide-callout">
+      <strong>Valid range:</strong> The model is validated for samples between 4% and 98% microbial reads. Predictions outside this range are flagged but still shown — treat them with caution and consider them indicative only.
+    </div>
+  </div>
+
+  <hr class="guide-divider">
+
+  <!-- Quick Start -->
+  <div class="guide-section">
+    <div class="guide-section-label">Quick Start</div>
+    <h2>How to use the predictor</h2>
+    <div class="guide-steps">
+      <div class="guide-step">
+        <div class="guide-step-num">1</div>
+        <div class="guide-step-body">
+          <h4>Run the dual-target qPCR</h4>
+          <p>Amplify <strong>16S rRNA</strong> and <strong>ACTB</strong> from your DNA extract using standard qPCR conditions. Record the Ct values for each sample.</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <div class="guide-step-num">2</div>
+        <div class="guide-step-body">
+          <h4>Calculate ΔCt (or let CTomics do it)</h4>
+          <p>Compute ΔCt = Ct_ACTB − Ct_16S per sample. Alternatively, provide raw Ct values in CSV mode and CTomics will calculate it automatically.</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <div class="guide-step-num">3</div>
+        <div class="guide-step-body">
+          <h4>Enter your data</h4>
+          <p>Use <strong>Manual</strong> mode for a quick paste, <strong>CSV / Paste</strong> to provide a full table, or <strong>Upload</strong> to load a file directly from disk.</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <div class="guide-step-num">4</div>
+        <div class="guide-step-body">
+          <h4>Set sequencing parameters</h4>
+          <p>Enter your target microbial read depth (M reads) and total sequencing capacity. CTomics will tell you how much sequencing you need per sample.</p>
+        </div>
+      </div>
+      <div class="guide-step">
+        <div class="guide-step-num">5</div>
+        <div class="guide-step-body">
+          <h4>Click Run Predictions and export</h4>
+          <p>Review results in the table and chart. Download a CSV with all predictions and confidence intervals for your records.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="guide-divider">
+
+  <!-- Input Formats -->
+  <div class="guide-section">
+    <div class="guide-section-label">Input Formats</div>
+    <h2>How to format your data</h2>
+    <div class="guide-grid">
+      <div class="guide-card">
+        <h3>Manual — ΔCt values</h3>
+        <p>One sample per line. Provide an optional ID followed by the ΔCt value, or just raw values.</p>
+        <div class="guide-code" style="margin-top:10px">
+<span class="c-muted">sample_id &nbsp; delta_ct</span>
+<span class="c-white">AH-PS-001 &nbsp; 7.73</span>
+<span class="c-white">S01 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 20.18</span>
+<span class="c-white">BAL-042 &nbsp;&nbsp;&nbsp; 1.20</span>
+        </div>
+      </div>
+      <div class="guide-card">
+        <h3>CSV — Raw Ct values</h3>
+        <p>Provide individual Ct values; CTomics computes ΔCt automatically from <code style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent)">ct_actb</code> and <code style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent)">ct_16s</code>.</p>
+        <div class="guide-code" style="margin-top:10px">
+<span class="c-muted">sample_id,ct_actb,ct_16s</span>
+<span class="c-white">AH-PS-001,24.881,17.150</span>
+<span class="c-white">HSV-11,29.487,15.288</span>
+<span class="c-white">S01,37.520,17.340</span>
+        </div>
+      </div>
+    </div>
+    <div class="guide-callout" style="margin-top:16px">
+      <strong>Accepted CSV columns:</strong> <code style="font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:11px">sample_id</code>, <code style="font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:11px">ct_actb</code>, <code style="font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:11px">ct_16s</code> — or — <code style="font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:11px">sample_id</code>, <code style="font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:11px">delta_ct</code>. Column names are case-insensitive. TSV and space-delimited files are also accepted.
+    </div>
+  </div>
+
+  <hr class="guide-divider">
+
+  <!-- Interpreting Results -->
+  <div class="guide-section">
+    <div class="guide-section-label">Interpreting Results</div>
+    <h2>Understanding the output</h2>
+    <p>Each sample is classified into one of three regimes based on its predicted microbial fraction:</p>
+    <div class="regime-row">
+      <div class="regime-item">
+        <span class="regime-pill" style="color:var(--success);background:rgba(5,150,105,0.08);">VALID</span>
+        <p><strong>4–98% microbial.</strong> Within the model's validated range. Predictions are reliable. Use the 95% CI to assess uncertainty.</p>
+      </div>
+      <div class="regime-item">
+        <span class="regime-pill" style="color:var(--danger);background:rgba(225,29,72,0.08);">LOW-ΔCt</span>
+        <p><strong>&lt;4% microbial.</strong> Host-dominated sample. The model approaches its lower asymptote. Predictions are indicative — actual microbial fraction may be even lower. Consider host depletion before sequencing.</p>
+      </div>
+      <div class="regime-item">
+        <span class="regime-pill" style="color:var(--purple);background:rgba(124,58,237,0.08);">SATURATED</span>
+        <p><strong>&gt;98% microbial.</strong> Near-pure microbial sample. The sigmoid approaches saturation. Prediction is a lower bound — true fraction is likely at or above 98%.</p>
+      </div>
+    </div>
+    <div class="guide-grid" style="margin-top:20px">
+      <div class="guide-card">
+        <h3>At N M reads → microbial</h3>
+        <p>How many microbial reads you would obtain if you sequence to your specified total depth. Computed as: <br><code style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent)">total_depth × (pred% / 100)</code></p>
+      </div>
+      <div class="guide-card">
+        <h3>To reach target → need</h3>
+        <p>Total sequencing depth required to yield your target number of microbial reads. Computed as: <br><code style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent)">target_reads / (pred% / 100)</code></p>
+      </div>
+    </div>
+  </div>
+
+  <hr class="guide-divider">
+
+  <!-- Citation -->
+  <div class="guide-section">
+    <div class="guide-section-label">Citation</div>
+    <h2>Reference</h2>
+    <p>If you use CTomics in your research, please cite the original model publication:</p>
+    <div class="guide-citation">
+      <p>
+        <span class="cite-title">Cho, I. et al. (2021). Quantitative prediction of the microbial composition of metagenomic samples from a targeted PCR assay for metagenomics.</span><br>
+        <span class="cite-journal">mSystems</span>, 6(3), e00552-21.<br>
+        <span style="color:var(--text-muted)">doi: 10.1128/mSystems.00552-21</span>
+      </p>
+    </div>
+  </div>
+
+</div><!-- /tab-about -->
 
 <script>
 // ============================================================
@@ -655,6 +1301,8 @@ const sampleNormal = (mu, sigma) => {
 let currentModel = 'cho';
 let results = [];
 let currentMode = 'manual';
+let lastChartSamples = [];
+let lastModelFn = choModel;
 
 function selectModel(btn) {
   document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
@@ -770,6 +1418,8 @@ function runPredictions() {
 // CHART
 // ============================================================
 function renderChart(samples, modelFn) {
+  lastChartSamples = samples;
+  lastModelFn = modelFn;
   const canvas = document.getElementById('chart');
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
@@ -793,11 +1443,11 @@ function renderChart(samples, modelFn) {
   const yScale = v => pad.top + cH - (v - yMin) / (yMax - yMin) * cH;
 
   // Background
-  ctx.fillStyle = '#f8f9fc';
+  ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, H);
 
   // Grid
-  ctx.strokeStyle = '#e0e4ef';
+  ctx.strokeStyle = '#ebebeb';
   ctx.lineWidth = 1;
   for (let y = 0; y <= 100; y += 20) {
     ctx.beginPath(); ctx.moveTo(pad.left, yScale(y)); ctx.lineTo(pad.left + cW, yScale(y)); ctx.stroke();
@@ -817,14 +1467,14 @@ function renderChart(samples, modelFn) {
     ctx.setLineDash([4, 3]);
     ctx.beginPath(); ctx.moveTo(pad.left, yScale(y)); ctx.lineTo(pad.left + cW, yScale(y)); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = color; ctx.font = '9px IBM Plex Mono'; ctx.textAlign = 'left';
+    ctx.fillStyle = color; ctx.font = '500 9px JetBrains Mono'; ctx.textAlign = 'left';
     ctx.fillText(label, pad.left + 4, yScale(y) - 3);
   };
   drawDash(4, 'rgba(255,107,53,0.7)', '4% threshold');
   drawDash(98, 'rgba(255,51,85,0.5)', '98% threshold');
 
   // Sigmoid curve
-  ctx.strokeStyle = '#0070cc'; ctx.lineWidth = 2.5; ctx.setLineDash([]);
+  ctx.strokeStyle = '#0d9488'; ctx.lineWidth = 2.5; ctx.setLineDash([]);
   ctx.beginPath();
   for (let d = xMin; d <= xMax; d += 0.1) {
     const x = xScale(d), y = yScale(modelFn(d));
@@ -833,12 +1483,12 @@ function renderChart(samples, modelFn) {
   ctx.stroke();
 
   // Axes
-  ctx.strokeStyle = '#c8d0e0'; ctx.lineWidth = 1;
+  ctx.strokeStyle = '#d0d0d0'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(pad.left, pad.top); ctx.lineTo(pad.left, pad.top + cH); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(pad.left, pad.top + cH); ctx.lineTo(pad.left + cW, pad.top + cH); ctx.stroke();
 
   // Axis labels
-  ctx.fillStyle = '#6b7a99'; ctx.font = '9px IBM Plex Mono'; ctx.textAlign = 'center';
+  ctx.fillStyle = '#94a3b8'; ctx.font = '9px JetBrains Mono'; ctx.textAlign = 'center';
   for (let x = -10; x <= 30; x += 5) {
     ctx.fillText(x, xScale(x), pad.top + cH + 14);
   }
@@ -861,7 +1511,7 @@ function renderChart(samples, modelFn) {
     // Dot
     ctx.fillStyle = color;
     ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = '#f8f9fc'; ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.stroke();
   });
 }
@@ -906,10 +1556,10 @@ function renderTable(data, targetReads, totalDepth) {
         ${data.map(d => {
           const pctColor = d.regime === 'low' ? 'var(--danger)' : d.regime === 'high' ? 'var(--purple)' : 'var(--success)';
           const regimeLabel = d.regime === 'low'
-            ? `<span style="color:var(--danger);background:rgba(255,51,85,0.1);padding:1px 6px;font-size:9px;">LOW-ΔCt</span>`
+            ? `<span style="color:var(--danger);background:rgba(225,29,72,0.08);padding:2px 8px;font-size:10px;border-radius:100px;font-family:'Jost',sans-serif;font-weight:700;letter-spacing:0.07em;">LOW-ΔCt</span>`
             : d.regime === 'high'
-            ? `<span style="color:var(--purple);background:rgba(168,85,247,0.1);padding:1px 6px;font-size:9px;">SATURATED</span>`
-            : `<span style="color:var(--success);background:rgba(0,230,118,0.08);padding:1px 6px;font-size:9px;">VALID</span>`;
+            ? `<span style="color:var(--purple);background:rgba(124,58,237,0.08);padding:2px 8px;font-size:10px;border-radius:100px;font-family:'Jost',sans-serif;font-weight:700;letter-spacing:0.07em;">SATURATED</span>`
+            : `<span style="color:var(--success);background:rgba(5,150,105,0.08);padding:2px 8px;font-size:10px;border-radius:100px;font-family:'Jost',sans-serif;font-weight:700;letter-spacing:0.07em;">VALID</span>`;
           const barPct = Math.min(100, d.pct);
           const barColor = d.regime === 'low' ? 'var(--danger)' : d.regime === 'high' ? 'var(--purple)' : 'var(--success)';
           return `<tr>
@@ -992,10 +1642,7 @@ BAL-042\t1.20
 BAL-007\t2.85
 BAL-031\t0.44`;
 
- // Draw initial empty curve once layout is settled
-  requestAnimationFrame(() => {
-    renderChart([], choModel);
-  });
+ // Chart drawn on first visit to Models tab
 });
 
 // ResizeObserver fires exactly when the container changes size
@@ -1011,6 +1658,137 @@ const ro = new ResizeObserver(() => {
   }, 50); // 50ms debounce — smooth without thrashing
 });
 ro.observe(document.getElementById('chart').parentElement);
+
+// ============================================================
+// CHART HOVER
+// ============================================================
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+(function setupChartHover() {
+  const canvas = document.getElementById('chart');
+
+  canvas.addEventListener('mousemove', e => {
+    if (!lastChartSamples.length) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const W = parseFloat(canvas.style.width) || canvas.parentElement.clientWidth - 2;
+    const H = 220;
+    const pad = { top: 16, right: 20, bottom: 36, left: 50 };
+    const cW = W - pad.left - pad.right;
+    const cH = H - pad.top - pad.bottom;
+    const xScale = d => pad.left + (d + 15) / 45 * cW;
+    const yScale = v => pad.top + cH - v / 100 * cH;
+
+    // Find nearest dot within hit radius
+    let hovered = null, minDist = 14;
+    lastChartSamples.forEach(s => {
+      const dist = Math.hypot(mx - xScale(s.delta), my - yScale(s.pct));
+      if (dist < minDist) { minDist = dist; hovered = s; }
+    });
+
+    canvas.style.cursor = hovered ? 'pointer' : 'default';
+
+    // Redraw base chart
+    renderChart(lastChartSamples, lastModelFn);
+
+    if (!hovered) return;
+
+    const ctx = canvas.getContext('2d');
+    const dotX = xScale(hovered.delta);
+    const dotY = yScale(hovered.pct);
+    const color = hovered.regime === 'low' ? '#ff3355' : hovered.regime === 'high' ? '#a855f7' : '#00e676';
+
+    // Highlighted dot (larger + glow ring)
+    ctx.fillStyle = color + '30';
+    ctx.beginPath(); ctx.arc(dotX, dotY, 11, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(dotX, dotY, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(dotX, dotY, 6, 0, Math.PI * 2); ctx.stroke();
+
+    // Tooltip content
+    const regimeLabel = hovered.regime === 'low' ? 'LOW-ΔCt' : hovered.regime === 'high' ? 'SATURATED' : 'VALID';
+    const lines = [
+      { text: hovered.id,                                        font: `600 11px 'JetBrains Mono',monospace`, color: '#f1f5f9' },
+      { text: `ΔCt   ${hovered.delta.toFixed(2)}`,              font: `400 10px 'JetBrains Mono',monospace`, color: '#fcd34d' },
+      { text: `pred  ${hovered.pct.toFixed(2)}%`,               font: `500 10px 'JetBrains Mono',monospace`, color },
+      { text: `CI    [${hovered.lo.toFixed(1)}%, ${hovered.hi.toFixed(1)}%]`, font: `400 10px 'JetBrains Mono',monospace`, color: '#64748b' },
+      { text: regimeLabel,                                       font: `700 9px 'JetBrains Mono',monospace`,  color },
+    ];
+
+    const padX = 10, padY = 8, lineH = 16;
+    const boxW = 182, boxH = lines.length * lineH + padY * 2;
+
+    // Keep tooltip inside canvas
+    let tx = dotX + 14;
+    let ty = dotY - boxH / 2;
+    if (tx + boxW > W - 4) tx = dotX - boxW - 14;
+    if (ty < 4) ty = 4;
+    if (ty + boxH > H - 4) ty = H - boxH - 4;
+
+    // Box
+    ctx.fillStyle = 'rgba(15,23,42,0.96)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 1;
+    roundRect(ctx, tx, ty, boxW, boxH, 5);
+    ctx.fill(); ctx.stroke();
+
+    // Text lines
+    lines.forEach((line, i) => {
+      ctx.fillStyle = line.color;
+      ctx.font = line.font;
+      ctx.textAlign = 'left';
+      ctx.fillText(line.text, tx + padX, ty + padY + i * lineH + 10);
+    });
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    if (lastChartSamples.length) renderChart(lastChartSamples, lastModelFn);
+    canvas.style.cursor = 'default';
+  });
+})();
+
+// ============================================================
+// TAB SWITCHING
+// ============================================================
+let modelsRendered = false;
+
+function switchTab(tab, btn) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  // Home
+  const home = document.getElementById('tab-home');
+  tab === 'home' ? home.classList.add('visible') : home.classList.remove('visible');
+
+  // About
+  const about = document.getElementById('tab-about');
+  tab === 'about' ? about.classList.add('visible') : about.classList.remove('visible');
+
+  // Models
+  const models = document.getElementById('tab-models');
+  models.style.display = tab === 'models' ? '' : 'none';
+
+  // Draw chart on first show of models tab
+  if (tab === 'models' && !modelsRendered) {
+    modelsRendered = true;
+    requestAnimationFrame(() => renderChart(results.length ? results : [], choModel));
+  }
+}
 </script>
 </body>
 </html>
