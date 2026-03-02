@@ -1,39 +1,48 @@
 import marimo
 
-__generated_with = "0.9.0"
+__generated_with = "0.19.6"
 app = marimo.App(width="medium")
 
 
-# ============================================================
-# HOW TO USE
-# ============================================================
-# marimo edit cho_svr_bootstrap.py
-#
-# Marimo looks like Jupyter with one structural rule:
-#   Variables flow from cell A to cell B by being
-#   (a) returned from cell A, and
-#   (b) listed as parameters of cell B.
-# Run cells top-to-bottom exactly like a Jupyter notebook.
-# ============================================================
-
-
-# ── CELL 1 ── imports ────────────────────────────────────────
 @app.cell
 def _():
     import marimo as mo
     import numpy as np
     import polars as pl
+    import hvplot.polars
+    import matplotlib.pyplot as plt
     from sklearn.svm import SVR
-    from sklearn.preprocessing import StandardScaler
+    from sklearn.preprocessing import StandardScaler, OneHotEncoder
     from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+    from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+    from sklearn.gaussian_process import GaussianProcessRegressor
+    from sklearn.gaussian_process.kernels import RBF, WhiteKernel
+    from sklearn.neighbors import KNeighborsRegressor
     from scipy import stats
     import warnings
     warnings.filterwarnings("ignore")
-    return mo, np, pl, SVR, StandardScaler, mean_squared_error, mean_absolute_error, r2_score, stats
+    return (
+        GaussianProcessRegressor,
+        GradientBoostingRegressor,
+        KNeighborsRegressor,
+        OneHotEncoder,
+        RBF,
+        RandomForestRegressor,
+        SVR,
+        StandardScaler,
+        WhiteKernel,
+        mean_absolute_error,
+        mean_squared_error,
+        mo,
+        np,
+        pl,
+        plt,
+        r2_score,
+        stats,
+    )
 
 
-# ── CELL 2 ── title ──────────────────────────────────────────
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md("""
     # Cho Model E  vs  SVR-RBF — Step-by-Step Bootstrap Comparison
@@ -55,35 +64,6 @@ def _(mo):
     return
 
 
-# ── CELL 3 ── The Cho Model E equation ──────────────────────
-#
-# Cho et al. 2021 Model E (mSystems, doi:10.1128/msystems.00552-21)
-#
-#   ŷ = 2.7201549 / ( 99.50267 · exp(−0.7218 · ΔCt) + 0.02733 )
-#
-# The constant +0.02733 in the denominator creates the hard lower
-# asymptote.  Let us work out the direction:
-#
-#   Large positive ΔCt  (ACTB >> 16S, lots of human DNA, few bacteria)
-#     → exp(−0.7218 × large+) → 0
-#     → denominator → 0.02733
-#     → ŷ → 2.7201549 / 0.02733 ≈ 99.5 %   [upper ceiling]
-#
-#   Large negative ΔCt  (16S >> ACTB, lots of bacterial DNA)
-#     → exp(−0.7218 × large−) = exp(large+) → ∞
-#     → denominator → ∞
-#     → ŷ → 0 %                              [lower floor]
-#
-# So the floor IS near zero — but at ΔCt = −10 it is already at
-# ~0.027 % and all samples with ΔCt < −5 are compressed into an
-# indistinguishably narrow band.  That is the resolution problem.
-#
-# For BAL/COPD samples:
-#   ACTB Ct is low (abundant human lung/immune cells)
-#   16S Ct is high (sparse bacteria)
-#   → ΔCt = ACTB − 16S is likely NEGATIVE or small positive
-#   → predictions land near the floor and cannot be distinguished
-# ─────────────────────────────────────────────────────────────
 @app.cell
 def _(np):
     def cho_model(delta_ct):
@@ -96,120 +76,97 @@ def _(np):
     test_d = np.array([-10, -5, 0, 5, 10, 15, 20])
     print("Cho model — ΔCt → predicted % microbial")
     print(f"{'ΔCt':>6}   {'pred%':>8}")
-    for d, p in zip(test_d, cho_model(test_d)):
-        print(f"  {d:>4}     {p:>7.4f}")
+    for _d, _p in zip(test_d, cho_model(test_d)):
+        print(f"  {_d:>4}     {_p:>7.4f}")
 
     print(f"\nFloor (ΔCt = −100) : {cho_model(np.array([-100.]))[0]:.6f} %")
     print(f"Ceiling (ΔCt = +100): {cho_model(np.array([+100.]))[0]:.4f} %")
     print()
     print("Practical problem: at ΔCt = −10 the model is already at ~0.027 %.")
     print("Every BAL sample with ΔCt < −5 gets the same compressed prediction.")
-    return cho_model
+    return (cho_model,)
 
 
-# ── CELL 4 ── dataset ────────────────────────────────────────
-#
-# qPCR Ct values are from Cho et al. Table S1.
-# Ground-truth % microbial is SIMULATED as Cho_prediction + noise
-# (SD = 4.35 %, matching the reported training-set residual SD).
-#
-# *** Replace pct_microbial with real sequencing values ***
-# Cho sequencing data: SRA accession PRJNA718445
-# ─────────────────────────────────────────────────────────────
 @app.cell
-def _(np, pl, cho_model):
-    rng = np.random.default_rng(seed=42)
-
-    # ── Cho paper samples ──────────────────────────────────
-    s16 = np.array([
-        17.150,13.208,13.772,15.664,13.859,14.071,17.716,19.196,
-        15.276,15.070,16.950,14.181,15.744,           # rectal (13)
-        15.288,14.883,13.352,16.097,14.188,16.705,22.317,  # vaginal (7)
-        17.795,15.953,16.624,16.193,15.171,14.976,
-        17.762,13.673,15.140,14.019,13.479,18.192,    # stool (12)
-        22.074,22.219,21.962,19.334,24.129,26.864,19.412,18.957,
-        20.471,25.027,25.835,16.629,24.245,24.735,    # oropharyngeal (14)
-    ])
-    actb = np.array([
-        24.881,27.498,29.418,24.227,26.632,29.838,27.141,26.005,
-        27.362,26.048,24.876,28.721,30.329,
-        29.487,34.364,23.588,25.045,24.816,24.585,23.727,
-        37.971,34.286,35.094,33.827,37.238,36.013,38.448,34.234,
-        32.067,34.945,33.873,38.773,
-        24.316,34.049,30.278,30.600,22.908,29.193,27.238,30.068,
-        26.683,29.333,30.654,21.802,26.367,21.284,
-    ])
-    s_types = (["Rectal swab"] * 13 + ["Vaginal"] * 7 +
-               ["Stool"] * 12    + ["Oropharyngeal"] * 14)
-    s_ids = (
-        ["AH-PS-001","AH-PS-003","AH-PS-004","AH-PS-006","AH-PS-011",
-         "AH-PS-016","AH-PS-018","AH-PS-020","AH-PS-021","AH-PS-031",
-         "AH-PS-039","AH-PS-044","AH-PS-051"] +
-        ["HSV-11","HSV-16","HSV-24","HSV-29","HSV-31","HSV-32","HSV-8"] +
-        ["S01","S04","S05","S07","S08","S11","S13","S14",
-         "S15","S17","S18","S19"] +
-        ["S49","S50","S51","S52","S53","S54","S55","S56",
-         "S57","S58","S70","S71","S83","S92"]
-    )
-
-    cho_delta = actb - s16
-    # SIMULATED ground truth — replace with real sequencing data
-    cho_truth = np.clip(
-        cho_model(cho_delta) + rng.normal(0, 4.35, len(cho_delta)),
-        0.01, 99.99
-    )
-
-    cho_df = pl.DataFrame({
-        "sample_id":     s_ids,
-        "sample_type":   s_types,
-        "delta_ct":      cho_delta,
-        "pct_microbial": cho_truth,
-        "dataset":       ["cho"] * len(s_ids),
-    })
-
-    # ── BAL COPD samples ────────────────────────────────────
-    # Typical BAL: ACTB Ct ~22-30, 16S Ct ~28-38  →  ΔCt negative
-    # REPLACE bal_delta and bal_truth with your real data
-    n_bal     = 70
-    bal_delta = rng.uniform(-15, 3, size=n_bal)
-    bal_truth = np.clip(
-        0.5 + 3.0 * np.exp(0.3 * bal_delta) + rng.normal(0, 0.5, n_bal),
-        0.01, 15.0
-    )
-
-    bal_df = pl.DataFrame({
-        "sample_id":     [f"BAL-{i:03d}" for i in range(n_bal)],
-        "sample_type":   ["BAL_COPD"] * n_bal,
-        "delta_ct":      bal_delta,
-        "pct_microbial": bal_truth,
-        "dataset":       ["bal"] * n_bal,
-    })
-
-    data = pl.concat([cho_df, bal_df])
+def _(pl):
+    data = pl.read_csv("../data/data.csv") 
     print(f"Combined dataset: {data.shape[0]} samples")
-    print()
-    print(data.group_by(["dataset","sample_type"]).len().sort(["dataset","sample_type"]))
     print()
     n_low = (data["pct_microbial"] < 4.0).sum()
     print(f"Samples < 4 % microbial (Cho failure zone): {n_low} / {data.shape[0]}")
-    print(f"ΔCt range:  {data['delta_ct'].min():.2f}  to  {data['delta_ct'].max():.2f}")
-    return data
+    print(f"ΔCt range:  {data['delta'].min():.2f}  to  {data['delta'].max():.2f}")
+    return (data,)
 
 
-# ── CELL 5 ── extract numpy arrays ──────────────────────────
 @app.cell
-def _(data, np):
-    X        = data["delta_ct"].to_numpy()
-    y        = data["pct_microbial"].to_numpy()
+def _(data):
+    X = data["delta"].to_numpy()
+    y = data["pct_microbial"].to_numpy()
     low_mask = y < 4.0
     print(f"X (ΔCt):          shape={X.shape}   range=[{X.min():.2f}, {X.max():.2f}]")
     print(f"y (% microbial):  shape={y.shape}   range=[{y.min():.2f}, {y.max():.2f}]")
     print(f"Near-zero (<4%):  {low_mask.sum()} samples")
-    return X, y, low_mask
+    return X, low_mask, y
 
 
-# ── CELL 6 ── Cho baseline evaluation ───────────────────────
 @app.cell
+def _(data):
+    data.hvplot.scatter(x='delta', 
+                        y='pct_microbial',
+                        by= 'sample_type', 
+                        height = 500, 
+                        width = 700, 
+                        size = 100, 
+                        alpha = 0.6,
+                       title = " Delta vs % microbial in reads")
+    return
+
+
+@app.cell
+def _(data):
+    data.hvplot.scatter(x='ct_16S', 
+                        y='ct_ACTB',
+                        by= 'sample_type', 
+                        height = 500, 
+                        width = 700, 
+                        size = 100, 
+                        alpha = 0.6,
+                       title = " Delta vs % microbial in reads")
+    return
+
+
+@app.cell
+def _(data):
+    data.sample()
+    return
+
+
+@app.cell
+def _(data, np):
+    """Absolute Ct comparison — same ΔCt, very different biological context."""
+    for _t in sorted(data["sample_type"].unique().to_list()):
+        _d = data.filter(data["sample_type"] == _t)
+        print(f"{_t}  (n={len(_d)})")
+        for _col in ["ct_16S", "ct_ACTB", "delta", "pct_microbial"]:
+            _v = _d[_col].to_numpy()
+            print(f"  {_col:<16}  median={np.median(_v):6.2f}  "
+                  f"range=[{_v.min():.2f}, {_v.max():.2f}]")
+        print()
+
+    # Spotlight: ΔCt 4–7 across sample types
+    print("─" * 74)
+    print("Samples with ΔCt 4–7  (same ΔCt window, different sample types):")
+    print(f"{'id':<12} {'type':<18} {'ct_16S':>7} {'ct_ACTB':>8} "
+          f"{'delta':>7} {'pct_microbial':>14}")
+    _w = data.filter((data["delta"] >= 4) & (data["delta"] <= 7))
+    for _row in _w.sort("sample_type").iter_rows(named=True):
+        print(f"{_row['id']:<12} {_row['sample_type']:<18} "
+              f"{_row['ct_16S']:>7.2f} {_row['ct_ACTB']:>8.2f} "
+              f"{_row['delta']:>7.2f} {_row['pct_microbial']:>14.4f}")
+    return
+
+
+@app.cell(hide_code=True)
 def _(mo):
     mo.md("""
     ## Cho model — baseline
@@ -222,9 +179,16 @@ def _(mo):
 
 
 @app.cell
-def _(X, y, low_mask, cho_model, np,
-      mean_squared_error, mean_absolute_error, r2_score):
-
+def _(
+    X,
+    cho_model,
+    low_mask,
+    mean_absolute_error,
+    mean_squared_error,
+    np,
+    r2_score,
+    y,
+):
     def print_metrics(yt, yp, label):
         rmse = float(np.sqrt(mean_squared_error(yt, yp)))
         mae  = float(mean_absolute_error(yt, yp))
@@ -242,11 +206,10 @@ def _(X, y, low_mask, cho_model, np,
     print()
     print("Positive bias in the near-zero zone = systematic over-prediction.")
     print("This is the asymptote floor pulling predictions away from zero.")
-    return cho_pred_full, cho_pred_low, print_metrics
+    return
 
 
-# ── CELL 7 ── SVR hyperparameters explained ─────────────────
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md("""
     ## SVR-RBF — understanding each hyperparameter
@@ -285,16 +248,8 @@ def _(mo):
     return
 
 
-# ── CELL 8 ── single SVR fit (pedagogical) ──────────────────
-#
-# We fit one SVR on the full dataset to inspect behaviour
-# BEFORE automating it in the bootstrap loop.
-# This is in-sample and therefore optimistic — do not report
-# these numbers; use bootstrap OOB metrics instead.
-# ─────────────────────────────────────────────────────────────
 @app.cell
-def _(X, y, cho_model, SVR, StandardScaler, np,
-      mean_squared_error, mean_absolute_error, r2_score):
+def _(SVR, StandardScaler, X, cho_model, mean_squared_error, np, r2_score, y):
 
     # 1. Scale
     sc_demo  = StandardScaler()
@@ -338,11 +293,10 @@ def _(X, y, cho_model, SVR, StandardScaler, np,
     print(f"Cho prediction at ΔCt=−15:  {cho_curve[0]:.4f}%  (near the floor)")
     print(f"SVR prediction at ΔCt=−15:  {svr_curve[0]:.4f}%")
     print("SVR trained on near-zero BAL data can predict below the Cho floor.")
-    return sc_demo, svr_demo, delta_grid, svr_curve, cho_curve
+    return
 
 
-# ── CELL 9 ── bootstrap rationale ───────────────────────────
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md("""
     ## Bootstrap resampling — why and how
@@ -372,31 +326,45 @@ def _(mo):
     return
 
 
-# ── CELL 10 ── bootstrap loop (100 iterations) ───────────────
 @app.cell
-def _(X, y, low_mask, cho_model,
-      SVR, StandardScaler, np,
-      mean_squared_error, mean_absolute_error, r2_score):
+def _(
+    GaussianProcessRegressor,
+    GradientBoostingRegressor,
+    KNeighborsRegressor,
+    RBF,
+    RandomForestRegressor,
+    SVR,
+    StandardScaler,
+    WhiteKernel,
+    X,
+    cho_model,
+    mean_absolute_error,
+    mean_squared_error,
+    np,
+    r2_score,
+    y,
+):
 
-    # ── hyperparameters — change these to explore ─────────
+    # ── hyperparameters ──────────────────────────────────
     N_BOOT  = 100
-    C       = 10.0
-    EPSILON = 2.0
-    GAMMA   = "scale"
+    C, EPSILON, GAMMA = 10.0, 2.0, "scale"
     SEED    = 42
     # ──────────────────────────────────────────────────────
 
-    rng_b = np.random.default_rng(SEED)
-    n     = len(X)
-
-    # One list per model × metric × zone
-    boot = {
-        "cho_rmse": [], "cho_mae": [], "cho_r2": [], "cho_bias": [],
-        "svr_rmse": [], "svr_mae": [], "svr_r2": [], "svr_bias": [],
-        "cho_rmse_low": [], "cho_mae_low": [],
-        "svr_rmse_low": [], "svr_mae_low": [],
-        "n_oob": [], "n_oob_low": [],
+    MODELS = {
+        "SVR": lambda: SVR(kernel="rbf", C=C, epsilon=EPSILON, gamma=GAMMA),
+        "RF":  lambda: RandomForestRegressor(n_estimators=200, random_state=SEED),
+        "GBR": lambda: GradientBoostingRegressor(n_estimators=100, random_state=SEED),
+        "GPR": lambda: GaussianProcessRegressor(
+                           kernel=RBF() + WhiteKernel(), normalize_y=True,
+                           random_state=SEED),
+        "KNN": lambda: KNeighborsRegressor(n_neighbors=5),
     }
+
+    # boot dict — one sub-dict per model including "cho"
+    _keys = ["rmse", "mae", "r2", "bias", "rmse_low", "mae_low"]
+    boot = {name: {k: [] for k in _keys} for name in ["cho"] + list(MODELS)}
+    boot["n_oob"] = []; boot["n_oob_low"] = []
 
     def _met(yt, yp):
         """Return (rmse, mae, r2, bias) as floats."""
@@ -407,97 +375,90 @@ def _(X, y, low_mask, cho_model,
             float(np.mean(yp - yt)),
         )
 
-    for _i in range(N_BOOT):
+    rng_b = np.random.default_rng(SEED)
+    n = len(X)
 
-        # ── in-bag / OOB split ──────────────────────────
-        ib  = rng_b.integers(0, n, size=n)      # draw with replacement
-        oob = np.setdiff1d(np.arange(n), ib)    # never-drawn samples
+    for _i in range(N_BOOT):
+        ib  = rng_b.integers(0, n, size=n)
+        oob = np.setdiff1d(np.arange(n), ib)
         if len(oob) < 5:
             continue
 
-        Xib, yib    = X[ib],   y[ib]
-        Xoob, yoob  = X[oob],  y[oob]
-        oob_low     = yoob < 4.0                 # near-zero mask within OOB
+        Xib, yib   = X[ib],  y[ib]
+        Xoob, yoob = X[oob], y[oob]
+        oob_low    = yoob < 4.0
 
-        # ── Cho on OOB — no fitting, just evaluate ──────
-        cho_oob             = cho_model(Xoob)
-        rm, ma, r2, bi      = _met(yoob, cho_oob)
-        boot["cho_rmse"].append(rm);   boot["cho_mae"].append(ma)
-        boot["cho_r2"].append(r2);     boot["cho_bias"].append(bi)
+        # Cho — fixed model, no fitting
+        cho_oob = cho_model(Xoob)
+        rm, ma, r2c, bi = _met(yoob, cho_oob)
+        boot["cho"]["rmse"].append(rm);  boot["cho"]["mae"].append(ma)
+        boot["cho"]["r2"].append(r2c);   boot["cho"]["bias"].append(bi)
         if oob_low.sum() >= 3:
             rm_l, ma_l, _, _ = _met(yoob[oob_low], cho_oob[oob_low])
-            boot["cho_rmse_low"].append(rm_l)
-            boot["cho_mae_low"].append(ma_l)
+            boot["cho"]["rmse_low"].append(rm_l)
+            boot["cho"]["mae_low"].append(ma_l)
 
-        # ── SVR on OOB — scale on in-bag only ───────────
+        # Scale once on in-bag, apply to OOB — used by all ML models
         sc      = StandardScaler()
-        Xib_sc  = sc.fit_transform(Xib.reshape(-1, 1))   # fit on training
-        Xoob_sc = sc.transform(Xoob.reshape(-1, 1))       # apply to OOB
+        Xib_sc  = sc.fit_transform(Xib.reshape(-1, 1))
+        Xoob_sc = sc.transform(Xoob.reshape(-1, 1))
 
-        svr = SVR(kernel="rbf", C=C, epsilon=EPSILON, gamma=GAMMA)
-        svr.fit(Xib_sc, yib)
-        svr_oob             = np.clip(svr.predict(Xoob_sc), 0., 100.)
-        rm, ma, r2, bi      = _met(yoob, svr_oob)
-        boot["svr_rmse"].append(rm);   boot["svr_mae"].append(ma)
-        boot["svr_r2"].append(r2);     boot["svr_bias"].append(bi)
-        if oob_low.sum() >= 3:
-            rm_l, ma_l, _, _ = _met(yoob[oob_low], svr_oob[oob_low])
-            boot["svr_rmse_low"].append(rm_l)
-            boot["svr_mae_low"].append(ma_l)
+        for _name, factory in MODELS.items():
+            mdl  = factory()
+            mdl.fit(Xib_sc, yib)
+            pred = np.clip(mdl.predict(Xoob_sc), 0., 100.)
+            rm, ma, r2m, bi = _met(yoob, pred)
+            boot[_name]["rmse"].append(rm);  boot[_name]["mae"].append(ma)
+            boot[_name]["r2"].append(r2m);   boot[_name]["bias"].append(bi)
+            if oob_low.sum() >= 3:
+                rm_l, ma_l, _, _ = _met(yoob[oob_low], pred[oob_low])
+                boot[_name]["rmse_low"].append(rm_l)
+                boot[_name]["mae_low"].append(ma_l)
 
         boot["n_oob"].append(len(oob))
         boot["n_oob_low"].append(int(oob_low.sum()))
 
-    valid = len(boot["cho_rmse"])
+    valid = len(boot["cho"]["rmse"])
     print(f"Bootstrap complete: {valid}/{N_BOOT} valid iterations")
     print(f"Mean OOB size      : {np.mean(boot['n_oob']):.1f} samples/iter")
     print(f"Mean OOB near-zero : {np.mean(boot['n_oob_low']):.1f} samples/iter")
-    return boot, N_BOOT, C, EPSILON, GAMMA
+    return MODELS, boot
 
 
-# ── CELL 11 ── summary table ─────────────────────────────────
 @app.cell
-def _(boot, np):
-    def _row(key, label):
-        a = np.array(boot[key])
-        return (label, a.mean(), a.std(),
-                np.percentile(a, 5), np.median(a), np.percentile(a, 95))
+def _(MODELS, boot, np):
+    def _row(name, metric):
+        a = np.array(boot[name][metric])
+        return a.mean(), a.std(), np.percentile(a,5), np.median(a), np.percentile(a,95)
 
-    hdr = f"{'Metric':<26}  {'Mean':>8} {'SD':>7} {'p5':>8} {'Median':>8} {'p95':>8}"
-    sep = "─" * 70
+    model_names = ["cho"] + list(MODELS)
+    hdr = f"{'Model':<8} {'Mean':>8} {'SD':>7} {'p5':>8} {'Median':>8} {'p95':>8}"
+    sep = "─" * 55
 
-    print("Full dataset (all OOB samples)")
-    print(hdr); print(sep)
-    for lbl, key in [
-        ("Cho  RMSE", "cho_rmse"), ("SVR  RMSE", "svr_rmse"),
-        ("Cho  MAE",  "cho_mae"),  ("SVR  MAE",  "svr_mae"),
-        ("Cho  R²",   "cho_r2"),   ("SVR  R²",   "svr_r2"),
-        ("Cho  Bias", "cho_bias"), ("SVR  Bias", "svr_bias"),
+    for zone_label, metric_keys in [
+        ("Full dataset",          ["rmse", "mae", "r2", "bias"]),
+        ("Near-zero zone (<4%)",  ["rmse_low", "mae_low"]),
     ]:
-        r = _row(key, lbl)
-        print(f"{r[0]:<26}  {r[1]:>8.4f} {r[2]:>7.4f} {r[3]:>8.4f} {r[4]:>8.4f} {r[5]:>8.4f}")
-
-    print()
-    print("Near-zero zone  (<4% microbial — Cho failure zone)")
-    print(hdr); print(sep)
-    for lbl, key in [
-        ("Cho  RMSE", "cho_rmse_low"), ("SVR  RMSE", "svr_rmse_low"),
-        ("Cho  MAE",  "cho_mae_low"),  ("SVR  MAE",  "svr_mae_low"),
-    ]:
-        r = _row(key, lbl)
-        print(f"{r[0]:<26}  {r[1]:>8.4f} {r[2]:>7.4f} {r[3]:>8.4f} {r[4]:>8.4f} {r[5]:>8.4f}")
+        print(f"\n{zone_label}")
+        for metric in metric_keys:
+            print(f"\n  {metric.upper().replace('_LOW','')}")
+            print(f"  {hdr}"); print(f"  {sep}")
+            for _name in model_names:
+                if metric not in boot[_name] or len(boot[_name][metric]) == 0:
+                    continue
+                mn, sd, p5, med, p95 = _row(_name, metric)
+                print(f"  {_name:<8} {mn:>8.4f} {sd:>7.4f} {p5:>8.4f} {med:>8.4f} {p95:>8.4f}")
     return
 
 
-# ── CELL 12 ── paired statistical test ──────────────────────
 @app.cell
 def _(mo):
     mo.md("""
     ## Statistical comparison
 
-    Both models are evaluated on the **same OOB set** each iteration,
-    so we compute per-iteration **ΔRMSE = Cho_RMSE − SVR_RMSE**.
-    Positive = SVR has lower error = SVR is better.
+    All models are evaluated on the **same OOB set** each iteration,
+    so we compute per-iteration **ΔRMSE = Cho_RMSE − model_RMSE**.
+    Positive = each ML model has lower error = ML model is better.
 
     We use the **Wilcoxon signed-rank test** (paired, non-parametric).
     H₀: median ΔRMSE = 0 (models are equivalent).
@@ -509,87 +470,464 @@ def _(mo):
 
 
 @app.cell
-def _(boot, np, stats):
-    for zone, ck, sk in [
-        ("Full dataset",    "cho_rmse",     "svr_rmse"),
-        ("Near-zero <4%",   "cho_rmse_low", "svr_rmse_low"),
+def _(MODELS, boot, np, stats):
+    for zone, cho_key, ml_key in [
+        ("Full dataset",  "rmse",     "rmse"),
+        ("Near-zero <4%", "rmse_low", "rmse_low"),
     ]:
-        n_   = min(len(boot[ck]), len(boot[sk]))
-        diff = np.array(boot[ck][:n_]) - np.array(boot[sk][:n_])
-        _, p = stats.wilcoxon(diff)
-        ci   = np.percentile(diff, [2.5, 97.5])
-
-        print(f"── {zone}")
-        print(f"  Mean ΔRMSE (Cho−SVR)  : {diff.mean():+.4f}%")
-        print(f"  SD                    : {diff.std():.4f}%")
-        print(f"  95% bootstrap CI      : [{ci[0]:+.4f},  {ci[1]:+.4f}]")
-        print(f"  SVR wins              : {100*np.mean(diff>0):.0f}% of iterations")
-        print(f"  Wilcoxon p            : {p:.3e}")
-        if p < 0.05:
-            winner = "SVR" if diff.mean() > 0 else "Cho"
-            print(f"  → {winner} significantly better (p < 0.05)")
-        else:
-            print(f"  → No significant difference (p ≥ 0.05)")
-        print()
+        print(f"\n══ {zone} ══")
+        cho_arr = np.array(boot["cho"][cho_key])
+        for _name in MODELS:
+            ml_arr = np.array(boot[_name][ml_key])
+            n_ = min(len(cho_arr), len(ml_arr))
+            if n_ < 10:
+                print(f"  {_name}: insufficient data"); continue
+            diff = cho_arr[:n_] - ml_arr[:n_]
+            _, p = stats.wilcoxon(diff)
+            ci   = np.percentile(diff, [2.5, 97.5])
+            winner_pct = 100 * np.mean(diff > 0)
+            sig = "✓" if p < 0.05 else "–"
+            print(f"  {_name:<5}  ΔRMSE={diff.mean():+.3f}%  "
+                  f"CI=[{ci[0]:+.2f},{ci[1]:+.2f}]  "
+                  f"wins={winner_pct:.0f}%  p={p:.2e}  {sig}")
     return
 
 
-# ── CELL 13 ── bias analysis ─────────────────────────────────
 @app.cell
-def _(boot, np):
-    cho_bias = np.array(boot["cho_bias"])
-    svr_bias = np.array(boot["svr_bias"])
-    print("Bias (positive = systematic over-prediction, full OOB set)")
-    print(f"  Cho:  {cho_bias.mean():+.4f}% ± {cho_bias.std():.4f}")
-    print(f"  SVR:  {svr_bias.mean():+.4f}% ± {svr_bias.std():.4f}")
-    print()
-    print("A positive Cho bias confirms the asymptote floor drags predictions")
-    print("upward for near-zero samples that land in the OOB set.")
-    print()
-    print("Reminder: these numbers are based on SIMULATED ground truth.")
-    print("Replace cho_truth and bal_truth in cell 4 with real sequencing data.")
+def _(MODELS, boot, np):
+    print("Bias (positive = over-prediction, full OOB set)")
+    for _name in ["cho"] + list(MODELS):
+        b = np.array(boot[_name]["bias"])
+        print(f"  {_name:<5}  {b.mean():+.4f}% ± {b.std():.4f}")
     return
 
 
-# ── CELL 14 ── next steps ────────────────────────────────────
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     mo.md("""
-    ## What to do next
+    ## Hyperparameter grid search — SVR × KNN
 
-    **1 — Replace simulated data with real values (cell 4)**
-    - Cho ground truth: download from SRA **PRJNA718445**, run KneadData,
-      compute pre/post-filter read counts → % microbial per sample.
-    - BAL ground truth: use your own shotgun sequencing output.
-
-    **2 — Add Gaussian Process Regression to the bootstrap loop**
-    ```python
-    from sklearn.gaussian_process import GaussianProcessRegressor
-    from sklearn.gaussian_process.kernels import RBF, WhiteKernel
-    kernel = RBF() + WhiteKernel()
-    gpr = GaussianProcessRegressor(kernel=kernel, normalize_y=True)
-    ```
-    GPR gives calibrated prediction intervals out of the box —
-    useful clinically and differentiates your paper from Cho.
-
-    **3 — Hyperparameter grid search**
-    Wrap cell 10 with a grid over `C ∈ {1, 10, 100}` and
-    `epsilon ∈ {1, 2, 5}`.  Pick the combination with the lowest
-    **mean OOB RMSE in the <4% zone** (not the full range).
-
-    **4 — Add 18S as a second feature**
-    Change `X = data["delta_ct"].to_numpy()` to a two-column matrix:
-    ```python
-    X = data.select(["delta_ct", "s18_ct"]).to_numpy()
-    ```
-    SVR and GPR handle multi-feature input natively.
-
-    **5 — Figures for the methods paper**
-    - Predicted vs observed scatter for the <4% zone, both models
-      overlaid, Cho asymptote floor as a dashed horizontal line
-    - Bootstrap RMSE distributions (violin), full range and <4% side by side
-    - Cho model curve with failure zones shaded, your BAL samples overlaid
+    - SVR: C ∈ {1, 10, 100} × ε ∈ {1, 2, 5}, γ=scale → 9 configs
+    - KNN: k ∈ {3, 5, 7, 10, 15} → 5 configs
+    - Cho included as fixed reference row every iteration
+    - 200 bootstrap iterations, optimise mean OOB RMSE in <4% zone
     """)
+    return
+
+
+@app.cell
+def _(
+    KNeighborsRegressor,
+    SVR,
+    StandardScaler,
+    X,
+    cho_model,
+    mean_absolute_error,
+    mean_squared_error,
+    np,
+    y,
+):
+    SVR_GRID = [{"C": c, "epsilon": e, "gamma": "scale"}
+                for c in [1, 10, 100] for e in [1, 2, 5]]
+    KNN_GRID = [{"n_neighbors": k} for k in [3, 5, 7, 10, 15]]
+
+    N_BOOT_TUNE = 200
+    SEED_TUNE   = 99
+
+    all_configs = {}
+    for _p in SVR_GRID:
+        _lbl = f"SVR_C{_p['C']}_e{_p['epsilon']}"
+        all_configs[_lbl] = {"type": "svr", "params": _p}
+    for _p in KNN_GRID:
+        _lbl = f"KNN_k{_p['n_neighbors']}"
+        all_configs[_lbl] = {"type": "knn", "params": _p}
+
+    boot_tune = {lbl: {"rmse_low": [], "mae_low": []}
+                 for lbl in ["cho"] + list(all_configs)}
+    boot_tune["n_oob_low"] = []
+
+    _rng_t = np.random.default_rng(SEED_TUNE)
+    _n = len(X)
+
+    for _i in range(N_BOOT_TUNE):
+        _ib  = _rng_t.integers(0, _n, size=_n)
+        _oob = np.setdiff1d(np.arange(_n), _ib)
+        if len(_oob) < 5:
+            continue
+        _Xoob, _yoob = X[_oob], y[_oob]
+        _oob_low = _yoob < 4.0
+        if _oob_low.sum() < 3:
+            continue
+
+        _sc      = StandardScaler()
+        _Xib_sc  = _sc.fit_transform(X[_ib].reshape(-1, 1))
+        _Xoob_sc = _sc.transform(_Xoob.reshape(-1, 1))
+        _yib     = y[_ib]
+
+        # Cho reference — no fitting
+        _cho_pred = cho_model(_Xoob[_oob_low])
+        boot_tune["cho"]["rmse_low"].append(
+            float(np.sqrt(mean_squared_error(_yoob[_oob_low], _cho_pred))))
+        boot_tune["cho"]["mae_low"].append(
+            float(mean_absolute_error(_yoob[_oob_low], _cho_pred)))
+
+        for _lbl, _cfg in all_configs.items():
+            _mdl = (SVR(kernel="rbf", **_cfg["params"]) if _cfg["type"] == "svr"
+                    else KNeighborsRegressor(**_cfg["params"]))
+            _mdl.fit(_Xib_sc, _yib)
+            _pred = np.clip(_mdl.predict(_Xoob_sc), 0., 100.)
+            boot_tune[_lbl]["rmse_low"].append(
+                float(np.sqrt(mean_squared_error(_yoob[_oob_low], _pred[_oob_low]))))
+            boot_tune[_lbl]["mae_low"].append(
+                float(mean_absolute_error(_yoob[_oob_low], _pred[_oob_low])))
+
+        boot_tune["n_oob_low"].append(int(_oob_low.sum()))
+
+    _valid = len(boot_tune["cho"]["rmse_low"])
+    print(f"Tuning bootstrap: {_valid}/{N_BOOT_TUNE} valid iterations")
+    print(f"Mean OOB near-zero: {np.mean(boot_tune['n_oob_low']):.1f} samples/iter")
+    return all_configs, boot_tune
+
+
+@app.cell
+def _(all_configs, boot_tune, np, stats):
+    _results = []
+    for _lbl in ["cho"] + list(all_configs):
+        _a = np.array(boot_tune[_lbl]["rmse_low"])
+        _results.append((_lbl, _a.mean(), _a.std(),
+                         np.percentile(_a, 5), np.median(_a), np.percentile(_a, 95)))
+    _results.sort(key=lambda _r: _r[1])
+
+    _cho_mean = np.mean(boot_tune["cho"]["rmse_low"])
+    _hdr = f"{'Config':<18} {'Mean':>8} {'SD':>7} {'p5':>8} {'Median':>8} {'p95':>8}"
+    _sep = "─" * 65
+    print("Near-zero RMSE (<4%) — ranked by mean  (lower = better)\n")
+    print(_hdr); print(_sep)
+    for _r in _results:
+        _tag = " ← Cho baseline" if _r[0] == "cho" else f"  Δ={_r[1]-_cho_mean:+.3f}"
+        print(f"{_r[0]:<18} {_r[1]:>8.4f} {_r[2]:>7.4f} {_r[3]:>8.4f} "
+              f"{_r[4]:>8.4f} {_r[5]:>8.4f}{_tag}")
+
+    # Wilcoxon: top-3 non-Cho configs vs Cho
+    _cho_arr = np.array(boot_tune["cho"]["rmse_low"])
+    _top3 = [_r for _r in _results if _r[0] != "cho"][:3]
+    print("\nWilcoxon (top-3 vs Cho, near-zero RMSE):")
+    for _r in _top3:
+        _ml_arr = np.array(boot_tune[_r[0]]["rmse_low"])
+        _nw = min(len(_cho_arr), len(_ml_arr))
+        _diff = _cho_arr[:_nw] - _ml_arr[:_nw]
+        _, _p = stats.wilcoxon(_diff)
+        _ci = np.percentile(_diff, [2.5, 97.5])
+        _sig = "✓" if _p < 0.05 else "–"
+        print(f"  {_r[0]:<18} ΔRMSE={_diff.mean():+.3f}%  "
+              f"CI=[{_ci[0]:+.2f},{_ci[1]:+.2f}]  p={_p:.2e}  {_sig}")
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    ## Final model — SVR(C=1, ε=1, γ=scale)
+
+    Grid search (200 bootstrap iterations) identified **SVR(C=1, ε=1)** as the
+    optimal configuration: mean OOB RMSE 7.78% in the <4% zone vs Cho's 11.32%
+    (ΔRMSE = +3.54%, p = 1.9×10⁻²³).
+
+    The cells below refit this model on the full 141-sample dataset for
+    inference and generate the three main paper figures.
+    """)
+    return
+
+
+@app.cell
+def _(SVR, StandardScaler, X, boot_tune, np, y):
+    sc_final = StandardScaler()
+    svr_final = SVR(kernel="rbf", C=1, epsilon=1, gamma="scale")
+    svr_final.fit(sc_final.fit_transform(X.reshape(-1, 1)), y)
+
+    _r = np.array(boot_tune["SVR_C1_e1"]["rmse_low"])
+    _c = np.array(boot_tune["cho"]["rmse_low"])
+    print("═══ Final model: SVR(C=1, ε=1, kernel=rbf, γ=scale) ═══\n")
+    print("OOB near-zero RMSE (<4% microbial) — 200 bootstrap iterations:")
+    print(f"  SVR(C=1, ε=1) : {_r.mean():.3f}% ± {_r.std():.3f}%"
+          f"   median={np.median(_r):.3f}%")
+    print(f"  Cho baseline  : {_c.mean():.3f}% ± {_c.std():.3f}%"
+          f"   median={np.median(_c):.3f}%")
+    print(f"  ΔRMSE (Cho−SVR): +{(_c - _r).mean():.3f}%")
+    print(f"\n  Support vectors (full-dataset fit): "
+          f"{len(svr_final.support_vectors_)}/{len(X)}")
+    return sc_final, svr_final
+
+
+@app.cell
+def _(X, cho_model, data, np, plt, sc_final, svr_final, y):
+    _fig1, (_ax1, _ax2) = plt.subplots(
+        1, 2, figsize=(13, 6),
+        gridspec_kw={"width_ratios": [3, 2], "wspace": 0.35},
+    )
+
+    _dg      = np.linspace(-4, 27, 400)
+    _dg_zoom = np.linspace(-4, 10, 300)
+    _prop    = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+    _types   = sorted(data["sample_type"].unique().to_list())
+
+    # ── Left panel: full range, Cho only ───────────────────────────────
+    _ax1.axhspan(0, 4, color="salmon", alpha=0.15, zorder=0)
+    _ax1.axhline(4, color="salmon", lw=1.2, ls="--", alpha=0.7)
+    _ax1.text(26.5, 5, "< 4 % failure zone", color="#c0392b",
+              ha="right", va="bottom", fontsize=9)
+    _ax1.plot(_dg, cho_model(_dg), color="black", lw=2.5,
+              label="Cho Model E", zorder=3)
+    for _i, _t in enumerate(_types):
+        _m = (data["sample_type"] == _t).to_numpy()
+        _ax1.scatter(X[_m], y[_m], color=_prop[_i],
+                     alpha=0.55, s=45, label=str(_t), zorder=4)
+    _ax1.set_xlabel("ΔCt (ACTB − 16S)", fontsize=12)
+    _ax1.set_ylabel("% microbial reads", fontsize=12)
+    _ax1.set_title("Full ΔCt range — Cho global fit", fontsize=12)
+    _ax1.set_xlim(-4.5, 27.5)
+    _ax1.set_ylim(-2, 105)
+    _ax1.legend(fontsize=9, loc="upper left")
+
+    # ── Right panel: <4% zone zoom, both models, only near-zero data ───
+    _low = y < 4.0
+    _ax2.axhspan(0, 4, color="salmon", alpha=0.20, zorder=0)
+    _ax2.axhline(4, color="salmon", lw=1.2, ls="--", alpha=0.8)
+    _ax2.plot(_dg_zoom, cho_model(_dg_zoom), color="black", lw=2.5,
+              label="Cho Model E", zorder=3)
+    _ax2.plot(_dg_zoom,
+              np.clip(svr_final.predict(
+                  sc_final.transform(_dg_zoom.reshape(-1, 1))), 0, 100),
+              color="#1f77b4", lw=2.5, label="SVR (C=1, ε=1)", zorder=3)
+    for _i, _t in enumerate(_types):
+        _m = (data["sample_type"] == _t).to_numpy() & _low
+        if _m.sum() == 0:
+            continue
+        _ax2.scatter(X[_m], y[_m], color=_prop[_i],
+                     alpha=0.70, s=55, zorder=4)
+    _ax2.set_xlabel("ΔCt (ACTB − 16S)", fontsize=12)
+    _ax2.set_ylabel("% microbial reads", fontsize=12)
+    _ax2.set_title("Near-zero zone (<4%) — SVR vs Cho", fontsize=12)
+    _ax2.set_xlim(-4.5, 10.5)
+    _ax2.set_ylim(-0.3, 15)
+    _ax2.legend(fontsize=10)
+
+    _fig1.suptitle("Figure 1 — Model comparison", fontsize=14)
+    plt.tight_layout()
+    plt.show()
+    return
+
+
+@app.cell
+def _(X, cho_model, np, plt, sc_final, svr_final, y):
+    _low = y < 4.0
+    _yt  = y[_low]
+    _Xl  = X[_low]
+    _cho_p = cho_model(_Xl)
+    _svr_p = np.clip(
+        svr_final.predict(sc_final.transform(_Xl.reshape(-1, 1))), 0, 100)
+
+    _lim = max(_yt.max(), _cho_p.max(), _svr_p.max()) * 1.1
+
+    _fig2, _ax = plt.subplots(figsize=(7, 6))
+    _ax.plot([0, _lim], [0, _lim], "k--", lw=1.2, label="1:1 line", zorder=1)
+    _ax.scatter(_yt, _cho_p, color="gray",    alpha=0.65, s=60, marker="s",
+                label="Cho Model E", zorder=3)
+    _ax.scatter(_yt, _svr_p, color="#1f77b4", alpha=0.65, s=60,
+                label="SVR (C=1, ε=1)", zorder=4)
+
+    _ax.set_xlabel("Observed % microbial reads", fontsize=12)
+    _ax.set_ylabel("Predicted % microbial reads", fontsize=12)
+    _ax.set_title("Figure 2 — Predicted vs observed, near-zero zone (<4%)\n"
+                  "(in-sample fit on full dataset — illustrative)", fontsize=12)
+    _ax.set_xlim(-0.1, _lim)
+    _ax.set_ylim(-0.1, _lim)
+    _ax.legend(fontsize=10)
+    plt.tight_layout()
+    plt.show()
+    return
+
+
+@app.cell
+def _(boot_tune, np, plt):
+    _keys   = ["cho", "SVR_C1_e1", "SVR_C1_e2", "KNN_k5", "KNN_k7"]
+    _labels = ["Cho\n(baseline)", "SVR\nC=1 ε=1", "SVR\nC=1 ε=2",
+               "KNN\nk=5", "KNN\nk=7"]
+    _colors = ["#d62728", "#1f77b4", "#aec7e8", "#ff7f0e", "#ffbb78"]
+    _vdata  = [np.array(boot_tune[k]["rmse_low"]) for k in _keys]
+
+    _fig3, _ax = plt.subplots(figsize=(9, 5))
+    _parts = _ax.violinplot(_vdata, positions=range(len(_keys)),
+                            showmedians=True, showextrema=False)
+    for _pc, _col in zip(_parts["bodies"], _colors):
+        _pc.set_facecolor(_col)
+        _pc.set_alpha(0.75)
+    _parts["cmedians"].set_color("black")
+    _parts["cmedians"].set_linewidth(2)
+
+    _ax.axhline(np.mean(boot_tune["cho"]["rmse_low"]),
+                color="#d62728", ls="--", lw=1.2, alpha=0.6,
+                label=f"Cho mean ({np.mean(boot_tune['cho']['rmse_low']):.2f}%)")
+    _ax.set_xticks(range(len(_labels)))
+    _ax.set_xticklabels(_labels, fontsize=11)
+    _ax.set_ylabel("OOB RMSE — near-zero zone (<4%)", fontsize=11)
+    _ax.set_title("Figure 3 — Bootstrap RMSE distributions (200 iterations)", fontsize=13)
+    _ax.legend(fontsize=10)
+    plt.tight_layout()
+    plt.show()
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md("""
+    ## Multi-feature model — site + absolute Ct
+
+    ΔCt alone discards absolute scale: at ΔCt ≈ 6, lung_BAL gives ~0.1% microbial
+    while oropharyngeal gives ~6%. The ct_16S and ct_ACTB values carry this information.
+
+    Feature sets tested (all SVR C=1, ε=1, γ=scale):
+    - SVR_1d        : [delta]                      — current baseline
+    - SVR_2d_dACTB  : [delta, ct_ACTB]             — adds host normalisation
+    - SVR_2d_raw    : [ct_16S, ct_ACTB]            — raw Ct, mechanistically clean
+    - SVR_3d_site   : [delta, ct_ACTB, site_ohe]   — adds explicit community context
+
+    200 bootstrap iterations (SEED=77), same OOB protocol.
+    """)
+    return
+
+
+@app.cell
+def _(OneHotEncoder, X, data, np):
+    _ct16S  = data["ct_16S"].to_numpy()
+    _ctACTB = data["ct_ACTB"].to_numpy()
+
+    X_2d_dACTB = np.column_stack([X, _ctACTB])        # [delta, ct_ACTB]
+    X_2d_raw   = np.column_stack([_ct16S, _ctACTB])   # [ct_16S, ct_ACTB]
+
+    # OHE fit on full dataset — site names are fixed metadata, not response-derived
+    _ohe = OneHotEncoder(sparse_output=False, drop="first")
+    _site_enc = _ohe.fit_transform(
+        data["sample_type"].to_numpy().reshape(-1, 1))
+    X_3d_site = np.column_stack([X, _ctACTB, _site_enc])
+
+    _types = _ohe.categories_[0].tolist()
+    print(f"Feature shapes:  1d={X.shape}  2d_dACTB={X_2d_dACTB.shape}"
+          f"  2d_raw={X_2d_raw.shape}  3d_site={X_3d_site.shape}")
+    print(f"Site OHE categories (drop first={_types[0]}): {_types[1:]}")
+    return (X_2d_dACTB, X_2d_raw, X_3d_site)
+
+
+@app.cell
+def _(
+    SVR,
+    StandardScaler,
+    X,
+    X_2d_dACTB,
+    X_2d_raw,
+    X_3d_site,
+    cho_model,
+    mean_absolute_error,
+    mean_squared_error,
+    np,
+    y,
+):
+    N_BOOT_MF = 200
+    SEED_MF   = 77
+
+    _feature_sets = {
+        "SVR_1d":       X.reshape(-1, 1),
+        "SVR_2d_dACTB": X_2d_dACTB,
+        "SVR_2d_raw":   X_2d_raw,
+        "SVR_3d_site":  X_3d_site,
+    }
+
+    boot_mf = {"cho": {"rmse_low": [], "mae_low": []}}
+    boot_mf.update({_k: {"rmse_low": [], "mae_low": []} for _k in _feature_sets})
+    boot_mf["n_oob_low"] = []
+
+    _rng  = np.random.default_rng(SEED_MF)
+    _n    = len(y)
+
+    for _i in range(N_BOOT_MF):
+        _ib  = _rng.integers(0, _n, size=_n)
+        _oob = np.setdiff1d(np.arange(_n), _ib)
+        if len(_oob) < 5:
+            continue
+        _yoob    = y[_oob]
+        _oob_low = _yoob < 4.0
+        if _oob_low.sum() < 3:
+            continue
+
+        # Cho — fixed model, no fitting needed
+        _cho_pred = cho_model(X[_oob][_oob_low])
+        boot_mf["cho"]["rmse_low"].append(
+            float(np.sqrt(mean_squared_error(_yoob[_oob_low], _cho_pred))))
+        boot_mf["cho"]["mae_low"].append(
+            float(mean_absolute_error(_yoob[_oob_low], _cho_pred)))
+
+        for _key, _Xall in _feature_sets.items():
+            _sc      = StandardScaler()
+            _Xib_sc  = _sc.fit_transform(_Xall[_ib])
+            _Xoob_sc = _sc.transform(_Xall[_oob])
+            _mdl     = SVR(kernel="rbf", C=1, epsilon=1, gamma="scale")
+            _mdl.fit(_Xib_sc, y[_ib])
+            _pred = np.clip(_mdl.predict(_Xoob_sc), 0., 100.)
+            boot_mf[_key]["rmse_low"].append(
+                float(np.sqrt(mean_squared_error(_yoob[_oob_low], _pred[_oob_low]))))
+            boot_mf[_key]["mae_low"].append(
+                float(mean_absolute_error(_yoob[_oob_low], _pred[_oob_low])))
+
+        boot_mf["n_oob_low"].append(int(_oob_low.sum()))
+
+    _valid = len(boot_mf["cho"]["rmse_low"])
+    print(f"Multi-feature bootstrap: {_valid}/{N_BOOT_MF} valid iterations")
+    print(f"Mean OOB near-zero: {np.mean(boot_mf['n_oob_low']):.1f} samples/iter")
+    return (boot_mf,)
+
+
+@app.cell
+def _(boot_mf, np, stats):
+    _order = ["cho", "SVR_1d", "SVR_2d_dACTB", "SVR_2d_raw", "SVR_3d_site"]
+    _results = []
+    for _k in _order:
+        _a = np.array(boot_mf[_k]["rmse_low"])
+        _results.append((_k, _a.mean(), _a.std(),
+                         np.percentile(_a, 5), np.median(_a), np.percentile(_a, 95)))
+
+    _cho_mean = np.mean(boot_mf["cho"]["rmse_low"])
+    _1d_mean  = np.mean(boot_mf["SVR_1d"]["rmse_low"])
+    _hdr = f"{'Config':<18} {'Mean':>8} {'SD':>7} {'p5':>8} {'Median':>8} {'p95':>8}"
+    _sep = "─" * 70
+    print("Near-zero RMSE (<4%) — multi-feature comparison\n")
+    print(_hdr); print(_sep)
+    for _r in _results:
+        if _r[0] == "cho":
+            _tag = " ← Cho baseline"
+        elif _r[0] == "SVR_1d":
+            _tag = f"  Δ_cho={_r[1]-_cho_mean:+.3f}"
+        else:
+            _tag = f"  Δ_cho={_r[1]-_cho_mean:+.3f}  Δ_1d={_r[1]-_1d_mean:+.3f}"
+        print(f"{_r[0]:<18} {_r[1]:>8.4f} {_r[2]:>7.4f} {_r[3]:>8.4f} "
+              f"{_r[4]:>8.4f} {_r[5]:>8.4f}{_tag}")
+
+    # Wilcoxon vs Cho and vs SVR_1d for all multi-feature variants
+    _cho_arr = np.array(boot_mf["cho"]["rmse_low"])
+    _1d_arr  = np.array(boot_mf["SVR_1d"]["rmse_low"])
+    print("\nWilcoxon tests — near-zero RMSE:")
+    for _k in ["SVR_1d", "SVR_2d_dACTB", "SVR_2d_raw", "SVR_3d_site"]:
+        _ml  = np.array(boot_mf[_k]["rmse_low"])
+        _nw  = min(len(_cho_arr), len(_ml))
+        _d1  = _cho_arr[:_nw] - _ml[:_nw]
+        _, _p1 = stats.wilcoxon(_d1)
+        if _k != "SVR_1d":
+            _d2  = _1d_arr[:_nw] - _ml[:_nw]
+            _, _p2 = stats.wilcoxon(_d2)
+            _extra = f"  vs SVR_1d: ΔRMSE={_d2.mean():+.3f}% p={_p2:.2e} {'✓' if _p2<0.05 else '–'}"
+        else:
+            _extra = ""
+        _sig1 = "✓" if _p1 < 0.05 else "–"
+        print(f"  {_k:<18} vs Cho: ΔRMSE={_d1.mean():+.3f}% p={_p1:.2e} {_sig1}{_extra}")
     return
 
 
