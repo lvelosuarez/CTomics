@@ -1,0 +1,24 @@
+22:24:37 INFO: Hostile v2.0.2. Mode: paired short read (Bowtie2)
+22:24:37 INFO: Found cached standard index human-t2t-hla-argos985
+22:24:37 INFO: Cleaning…
+22:26:22 INFO: Cleaning complete
+[
+    {
+        "version": "2.0.2",
+        "aligner": "bowtie2",
+        "index": "human-t2t-hla-argos985",
+        "options": [],
+        "fastq1_in_name": "SRR14117819_1.fastq.gz",
+        "fastq1_in_path": "/WORKING_DIRECTORY/lvelo/Apps/CTomics/scripts/cho_qc/SRR14117819_1.fastq.gz",
+        "reads_in": 8983394,
+        "reads_out": 258956,
+        "reads_removed": 8724438,
+        "reads_removed_proportion": 0.97117,
+        "fastq2_in_name": "SRR14117819_2.fastq.gz",
+        "fastq2_in_path": "/WORKING_DIRECTORY/lvelo/Apps/CTomics/scripts/cho_qc/SRR14117819_2.fastq.gz",
+        "fastq1_out_name": "SRR14117819_1.clean_1.fastq.gz",
+        "fastq1_out_path": "cho_dehost/SRR14117819_1.clean_1.fastq.gz",
+        "fastq2_out_name": "SRR14117819_2.clean_2.fastq.gz",
+        "fastq2_out_path": "cho_dehost/SRR14117819_2.clean_2.fastq.gz"
+    }
+]
