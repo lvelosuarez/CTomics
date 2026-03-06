@@ -95,8 +95,8 @@ CTomics/
 
 This project is dual-licensed:
 
-• GPL-3.0 for open-source use
+• GPL-3.0 for open-source use <br>
 • Commercial license available for proprietary use
 
-Contact: lourdes.velosuarez@chu-brest-fr
+Contact: lourdes.velosuarez@chu-brest-fr <br>
 CTomics is for research purposes. Data from Cho et al. 2021 is used under the terms of the original publication (CC BY 4.0 / open access). REPAIR cohort data is de-identified and used under institutional approval.
