@@ -84,9 +84,7 @@ def _(pl):
         null_values=["NA", "", "None"],
         infer_schema_length=200,
     )
-    _raw = _raw.filter(pl.col("sample_type") != "lung_sputum")
-
-    SAMPLE_TYPES = ["lung_bal", "oropharyngeal", "stool", "rectal_swab", "vaginal_sample"]
+    SAMPLE_TYPES = ["lung_bal", "oropharyngeal", "stool", "rectal_swab", "vaginal_sample", "lung_sputum"]
     TYPE_IDX = {t: i for i, t in enumerate(SAMPLE_TYPES)}
 
     PALETTE = {
@@ -95,6 +93,7 @@ def _(pl):
         "rectal_swab":    "#1b7837",
         "vaginal_sample": "#d6282a",
         "lung_bal":       "#7c3aed",
+        "lung_sputum":    "#f97316",
     }
 
     df = _raw.with_columns([
@@ -324,6 +323,77 @@ def _(
         mo.ui.table(df_regime),
     ])
     return MODEL_NAMES, REGIME_ORDER, regimes
+
+
+@app.cell
+def _(MODEL_NAMES, mo, np, oof, pl, regimes, y_pct):
+    # ── Bootstrap CI on LOOCV RMSE ───────────────────────────────────────────────
+    # Resample (y_true, y_pred) LOOCV pairs with replacement N_BOOT times.
+    # Each iteration recomputes RMSE → sampling distribution → 95% CI + p-value vs Cho.
+    # p_vs_Cho = fraction of bootstrap samples where model does NOT beat Cho (lower = better).
+
+    _N_BOOT = 1000
+    _rng    = np.random.default_rng(42)
+    _n      = len(y_pct)
+    _reg_arr = np.array(regimes)
+
+    _boot = {_m: {"all": [], "bal": [], "cho_fail": []} for _m in MODEL_NAMES}
+
+    for _ in range(_N_BOOT):
+        _idx  = _rng.integers(0, _n, size=_n)
+        _yt   = y_pct[_idx]
+        _rb   = _reg_arr[_idx]
+        for _m in MODEL_NAMES:
+            _yp   = oof[_m][_idx]
+            _mask = ~np.isnan(_yp)
+            if _mask.sum() > 1:
+                _boot[_m]["all"].append(float(np.sqrt(np.mean((_yt[_mask] - _yp[_mask]) ** 2))))
+            _bal  = _mask & (_rb == "< 2% (BAL)")
+            if _bal.sum() > 1:
+                _boot[_m]["bal"].append(float(np.sqrt(np.mean((_yt[_bal] - _yp[_bal]) ** 2))))
+            _cf   = _mask & (_rb == "2-4% (Cho fail)")
+            if _cf.sum() > 1:
+                _boot[_m]["cho_fail"].append(float(np.sqrt(np.mean((_yt[_cf] - _yp[_cf]) ** 2))))
+
+    def _bstats(vals_m, vals_cho, label, regime):
+        _bm  = np.array(vals_m)
+        _bc  = np.array(vals_cho)
+        _k   = min(len(_bm), len(_bc))
+        _d   = _bc[:_k] - _bm[:_k]   # positive = model beats Cho
+        return {
+            "model":        label,
+            "regime":       regime,
+            "RMSE":         round(float(_bm.mean()), 3),
+            "CI_lo":        round(float(np.percentile(_bm, 2.5)), 3),
+            "CI_hi":        round(float(np.percentile(_bm, 97.5)), 3),
+            "ΔRMSE_vs_Cho": round(float(_d.mean()), 3),
+            "p_vs_Cho":     round(float((_d <= 0).mean()), 4),
+        }
+
+    _cho_all = _boot["M0_Cho"]["all"]
+    _cho_bal = _boot["M0_Cho"]["bal"]
+    _cho_cf  = _boot["M0_Cho"]["cho_fail"]
+
+    _df_b_all = pl.DataFrame([_bstats(_boot[_m]["all"],      _cho_all, _m, "all")          for _m in MODEL_NAMES])
+    _df_b_bal = pl.DataFrame([_bstats(_boot[_m]["bal"],      _cho_bal, _m, "< 2% (BAL)")   for _m in MODEL_NAMES])
+    _df_b_cf  = pl.DataFrame([_bstats(_boot[_m]["cho_fail"], _cho_cf,  _m, "2-4% (Cho fail)") for _m in MODEL_NAMES])
+
+    mo.vstack([
+        mo.md("## Bootstrap RMSE — 1000 iterations (seed=42)"),
+        mo.md("### Global (all 154 samples)"),
+        mo.ui.table(_df_b_all),
+        mo.md("### Near-zero zone — BAL regime (< 2%)"),
+        mo.ui.table(_df_b_bal),
+        mo.md("### Cho failure zone (2–4%)"),
+        mo.ui.table(_df_b_cf),
+        mo.md(
+            "> **RMSE** = bootstrap mean. **CI_lo / CI_hi** = 2.5th–97.5th percentile (95% CI). "
+            "> **ΔRMSE_vs_Cho** = mean(RMSE_Cho − RMSE_model): positive means model beats Cho. "
+            "> **p_vs_Cho** = fraction of bootstrap iterations where model does NOT beat Cho "
+            "> (treat p < 0.05 as significant improvement)."
+        ),
+    ])
+    return
 
 
 @app.cell
@@ -736,25 +806,48 @@ def _(
 
 
 @app.cell
-def _(mo):
-    mo.md(r"""
-    ---
-    ## Modelling summary and next steps
+def _(
+    GaussianProcessRegressor,
+    Matern,
+    StandardScaler,
+    WhiteKernel,
+    X_base,
+    mo,
+    np,
+    y_logit,
+):
+    import joblib, pathlib
 
-    | Finding | Interpretation |
-    |---------|----------------|
-    | **M1 Beta** best global calibration | Proportional target well-suited to beta distribution; no floor artefact |
-    | **M4 XGB** lowest RMSE 4-98% | Tree splits naturally separate sample types; consider M1+M4 ensemble |
-    | **M5 GPR** largest uncertainty on BAL | Flag samples with sigma > 0.5 logit units for re-assay recommendation |
-    | **Cho collapses** all BAL to ~0.03% floor | BAL is fully OOD for Cho; any trained model should beat it here |
-    | **LOPOCV vs LOOCV gap** | If gap > 2x LOOCV RMSE enforce patient-level splits in production |
-    | **Qubit ablation** | Positive delta-RMSE -> include Qubit as feature for BAL pipeline |
+    # ── Train GPR on full dataset (154 samples) and serialize for Pyodide ────────
+    _kernel = 1.0 * Matern(length_scale=1.0, nu=1.5) + WhiteKernel(noise_level=0.1)
+    _gpr    = GaussianProcessRegressor(
+        kernel=_kernel, normalize_y=True,
+        n_restarts_optimizer=2, random_state=42,
+    )
+    _scaler = StandardScaler()
+    _X_sc   = _scaler.fit_transform(X_base)
+    _gpr.fit(_X_sc, y_logit)
 
-    **Recommended production model**:
-    - Global samples (4-98%): Cho Model E remains competitive — use M4 XGB as drop-in replacement
-    - BAL / low-microbial (<4%): M1 Beta or M5 GPR with Qubit feature
-    - Uncertainty flag: GPR posterior std > 0.5 in logit space -> "low confidence, consider re-assay"
-    """)
+    _out = pathlib.Path("../models")
+    _out.mkdir(exist_ok=True)
+    joblib.dump({"gpr": _gpr, "scaler": _scaler}, _out / "gpr_ctomics.pkl")
+
+    # Smoke-test: predict first 3 samples
+    _mu, _sig = _gpr.predict(_scaler.transform(X_base[:3]), return_std=True)
+    _pct_pred = 100.0 / (1.0 + np.exp(-np.clip(_mu, -30, 30)))
+
+    mo.vstack([
+        mo.md("## GPR — full model serialized to `models/gpr_ctomics.pkl`"),
+        mo.md(
+            f"- **Samples**: {X_base.shape[0]}  \n"
+            f"- **Features**: {X_base.shape[1]} (ct_ACTB, ct_16S, delta + 6-type OHE)  \n"
+            f"- **Kernel (fitted)**: `{_gpr.kernel_}`  \n"
+            f"- **Scaler mean**: `{[round(float(v),3) for v in _scaler.mean_]}`  \n"
+            f"- **Smoke-test predictions (first 3)**: `{[round(float(v),3) for v in _pct_pred]}` %"
+        ),
+        mo.md("> Load in Pyodide with: `import joblib; bundle = joblib.load('gpr_ctomics.pkl')`  \n"
+              "> Predict: `mu, sigma = bundle['gpr'].predict(bundle['scaler'].transform(X), return_std=True)`"),
+    ])
     return
 
 
