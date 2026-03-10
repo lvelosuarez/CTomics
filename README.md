@@ -6,22 +6,23 @@
 
 ## The Problem
 
-In host-associated samples (e.g., BAL, rectal swabs, oropharyngeal swabs), shotgun metagenomic libraries are dominated by human DNA. After computational host depletion against GRCh38, microbial reads can represent as little as **0.01–5% of total sequenced reads** — but this is only known *after* sequencing.
+In host-associated metagenomics, microbial reads can represent anywhere from 0.01% to >99% of a sequencing library — but this is only known *after* sequencing. Two failure modes result:
 
-This creates two failure modes:
 - **Underpowering**: insufficient microbial depth for resistome profiling, taxonomic resolution, or functional analysis
-- **Oversequencing**: wasted reads and cost when the host fraction is unexpectedly high
+- **Oversequencing**: wasted reads when the host fraction is unexpectedly high
+
+This is especially acute for **low-biomass respiratory specimens** (BAL, sputum) where microbial fractions below 4% are the norm, not the exception.
 
 ## The Approach
 
-CTomics uses **two routine qPCR measurements** taken before sequencing to predict microbial read fraction:
+CTomics predicts the microbial read fraction **before sequencing** from two routine qPCR measurements:
 
 | Measurement | Target | Proxy for |
 |---|---|---|
 | `Ct_16S` | 16S rRNA gene | Total bacterial DNA load |
 | `Ct_ACTB` | Human β-actin gene | Total human DNA load |
 
-From these, a single derived feature is computed:
+The key derived feature is:
 
 ```
 ΔCt = Ct_ACTB − Ct_16S
@@ -29,28 +30,61 @@ From these, a single derived feature is computed:
 
 Higher ΔCt → more bacterial DNA relative to human DNA → higher expected microbial read fraction.
 
-## Why Not Just Use the Cho et al. Model?
+## Models
 
-Cho et al. (2021, *mSystems*, DOI: [10.1128/msystems.00552-21](https://doi.org/10.1128/msystems.00552-21)) showed that ΔCt follows a sigmoidal relationship with sequencing microbial fraction (R² = 0.990). Their Model E is:
+CTomics provides two complementary prediction models:
+
+### Cho Model E (baseline)
+
+Cho et al. (2021) showed that ΔCt follows a four-parameter sigmoid (R² = 0.990 on stool and oropharyngeal samples):
 
 $$\hat{y} = \frac{2.7201549}{99.50267 \cdot e^{-0.7218 \cdot \Delta Ct} + 0.02733}$$
 
-This model achieves R² = 0.990 on stool and oropharyngeal samples, but underestimates microbial fractions in transition-zone and low-biomass samples. CTomics aims to improve on this baseline specifically for clinical respiratory specimens.
+**Limitation:** The sigmoid has a lower asymptote at ~0.027%, making it unable to resolve samples below ~4% microbial reads. BAL and other low-biomass respiratory specimens cluster precisely in this compressed tail. Bootstrap LOOCV (1000 iterations, n=154) confirms RMSE ≈ 12% in the <4% zone.
 
-- The sigmoid has a **lower asymptote of ~0.027%** — it cannot resolve samples below ~4% microbial reads
-- Low-biomass samples such as **BAL fluid** cluster precisely in this compressed lower tail (ΔCt < 5)
-- Predictive error in this regime has the greatest clinical consequence
+### GPR — site-aware model
 
-> Cho MY, Wandro S, Fadrosh D, et al. *Two-Target Quantitative PCR To Predict Library Composition for Shallow Shotgun Sequencing.* mSystems. 2021;6(4):e00552-21. doi:[10.1128/mSystems.00552-21](https://doi.org/10.1128/mSystems.00552-21)
+A Gaussian Process Regressor with Matérn ν=1.5 kernel trained on 154 samples across six clinical specimen types. Uses Ct_ACTB, Ct_16S, ΔCt, and a one-hot-encoded specimen type as features (9 features total):
 
+$$\hat{y} = \frac{100}{1 + e^{-\mu}}, \quad \mu \sim \mathcal{GP}\!\left(\text{Matérn}_{\nu=1.5},\,\sigma_f^2=3.33,\,l=10.9\right)$$
 
-## What CTomics Does
+The fitted kernel `1.82² × Matérn(l=10.9, ν=1.5) + WhiteKernel(0.067)` was selected by marginal likelihood. Outputs include calibrated posterior uncertainty (σ) and asymmetric 95% CIs via `inv-logit(μ ± 1.96σ)`.
 
-CTomics extends the Cho framework into the **low-ΔCt regime** by:
+**Performance vs Cho (bootstrap LOOCV, n=154):**
 
-1. Integrating Cho et al. training data with matched qPCR + sequencing data from the **REPAIR cohort** (BAL samples)
-2. Training and benchmarking multiple machine learning models (Beta regression, Gaussian Process, gradient boosting, etc.) specifically optimised for the low-biomass region
-3. Providing calibrated predictions with uncertainty estimates to support **a priori sequencing depth decisions**
+| Zone | Cho RMSE | GPR RMSE | ΔRMSE | p-value |
+|---|---|---|---|---|
+| All samples | 5.7% | 2.4% | −3.3% | <0.05 |
+| BAL regime (<2%) | ~12% | ~2.4% | ~−10% | <0.001 |
+| Cho failure zone (<4%) | ~12% | ~4.5% | −7.8% | <10⁻³¹ |
+
+The site OHE alone accounts for ~3.5 pp of the improvement (p=10⁻³¹), reflecting the fact that identical ΔCt maps to very different microbial fractions across specimen types.
+
+## Training Data
+
+154 samples across six specimen types (ΔCt range −3.45 to +26.4, microbial fraction 0.06–99.5%):
+
+| Specimen type | n |
+|---|---|
+| Lung BAL | ~68 |
+| Oropharyngeal | ~55 |
+| Stool | ~14 |
+| Rectal swab | ~7 |
+| Vaginal sample | ~7 |
+| Lung sputum | 13 |
+
+**Sources:**
+- **Cho et al. 2021** — Ct values from Table S3; percent microbial reads re-analysed from NCBI for validation samples
+- **REPAIR cohort** — BAL from patients with rheumatoid arthritis-associated ILD; Ct_16S (SYBR Green) and Ct_ACTB (TaqMan); microbial fraction from Illumina shotgun sequencing after KneadData host filtering
+- **Lung sputum** — independent out-of-distribution validation set (n=13)
+
+---
+
+## Web Tool
+
+**Live tool:** [lvelosuarez.github.io/CTomics](https://lvelosuarez.github.io/CTomics/)
+
+The predictor runs entirely in the browser. The GPR model parameters are embedded as Float64 arrays in `ctomics.html`; inference uses a pure-JavaScript implementation of the Matérn kernel + Cholesky forward substitution (~2 ms for 20 samples). No server, no Python, no WebAssembly runtime required.
 
 ---
 
@@ -58,13 +92,22 @@ CTomics extends the Cho framework into the **low-ΔCt regime** by:
 
 ```
 CTomics/
-├── scripts/
-│   └──  
 ├── data/
-│   └── data.csv              # Combined training dataset (Cho 2021 + REPAIR)
-├── notebooks/                # Exploratory analysis and model training notebooks
+│   ├── data.csv              # Combined training dataset (154 samples)
+│   ├── data_original.csv     # Cho et al. 2021 data only
+│   └── data_sputum.csv       # Lung sputum OOD validation set
+├── models/
+│   └── gpr_ctomics.pkl       # Fitted GPR + StandardScaler (joblib, sklearn 1.7)
+├── notebooks/
+│   ├── theory.py             # Theoretical derivation of the ΔCt–fraction relationship
+│   ├── eda.py                # Exploratory data analysis
+│   ├── modelling.py          # LOOCV benchmarking (6 models) + bootstrap CI + GPR serialisation
+│   └── ood.py                # Out-of-distribution validation on lung sputum
 ├── images/
 │   └── logo.svg
+├── docs/
+│   └── index.html            # Project landing page (standalone)
+├── ctomics.html              # Interactive predictor (standalone, ~346 KB)
 └── README.md
 ```
 
@@ -73,30 +116,30 @@ CTomics/
 | Column | Description |
 |---|---|
 | `id` | Sample identifier |
-| `sample_type` | Biological specimen type (`stool`, `oropharyngeal`, `rectal_swab`, `vaginal_sample`, `lung_BAL`) |
-| `ct_16S` | 16S rRNA qPCR Ct value — bacterial load proxy |
-| `ct_ACTB` | β-actin qPCR Ct value — human DNA load proxy |
-| `delta` | ΔCt = Ct_ACTB − Ct_16S; key predictor of microbial fraction |
+| `sample_type` | Specimen type (`stool`, `oropharyngeal`, `rectal_swab`, `vaginal_sample`, `lung_bal`, `lung_sputum`) |
+| `ct_16S` | 16S rRNA qPCR Ct value |
+| `ct_ACTB` | β-actin qPCR Ct value |
+| `delta` | ΔCt = Ct_ACTB − Ct_16S |
 | `pct_microbial` | % reads surviving host-read filtering (target variable) |
-| `source` | Dataset origin: `cho2021` or `this study` |
+| `run` | Sequencing run identifier |
+| `instrument` | Sequencing platform |
 
 ---
-
-## Data Sources
-
-**Cho et al. 2021** — Ct values transcribed from Table S3 of the supplementary material. Percent microbial reads for validation samples (rectal swab, vaginal; n = 20) were re-analyzed from their ncbi repository. 
-
-**REPAIR cohort** — Bronchoalveolar lavage samples from patients with rheumatoid arthritis-associated interstitial lung disease. Ct_16S and Ct_ACTB were measured by SYBR Green and TaqMan qPCR, respectively. Percent microbial reads computed from real Illumina shotgun sequencing after KneadData host filtering.
-
----
-
 
 ## License
 
 This project is dual-licensed:
 
-• GPL-3.0 for open-source use <br>
+• GPL-3.0 for open-source use
 • Commercial license available for proprietary use
 
-Contact: lourdes.velosuarez@chu-brest-fr <br>
-CTomics is for research purposes. Data from Cho et al. 2021 is used under the terms of the original publication (CC BY 4.0 / open access). REPAIR cohort data is de-identified and used under institutional approval.
+Contact: lourdes.velosuarez@chu-brest.fr
+CTomics is for research purposes only. Data from Cho et al. 2021 used under CC BY 4.0. REPAIR cohort data is de-identified and used under institutional approval.
+
+---
+
+## References
+
+> Cho MY, Wandro S, Fadrosh D, et al. *Two-Target Quantitative PCR To Predict Library Composition for Shallow Shotgun Sequencing.* mSystems. 2021;6(4):e00552-21. [doi:10.1128/mSystems.00552-21](https://doi.org/10.1128/mSystems.00552-21)
+
+> Velo Suárez L, et al. *CTomics: site-aware Gaussian Process prediction of metagenomic microbial fraction from dual-target qPCR.* Manuscript in preparation.

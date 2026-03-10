@@ -1200,10 +1200,10 @@ or: sample_id, delta_ct"></textarea>
     <div class="guide-section-label">Overview</div>
     <h2>What is CTomics?</h2>
     <p>
-      Clinical and environmental metagenomics samples often contain a mix of host DNA and microbial DNA. Before committing to deep sequencing, it is useful to know what fraction of reads will be microbial — this determines how much sequencing you actually need to reach a target number of microbial reads.
+      In host-associated metagenomics, the fraction of sequenced reads that are microbial can range from &lt;0.1% to &gt;99% — but this is only known <em>after</em> sequencing. Committing to the wrong depth causes either underpowered microbiome analysis or wasted sequencing cost.
     </p>
     <p>
-      CTomics implements the predictive model published by Cho et al. (2021) that links a simple, inexpensive dual-target qPCR result to the percentage of microbial reads in the final sequencing library. No sequencing is needed to obtain the prediction.
+      CTomics predicts this microbial fraction <strong>before sequencing</strong> from two routine qPCR measurements already performed in most metagenomics pipelines: Ct values for the <strong>16S rRNA gene</strong> (bacterial load) and <strong>ACTB</strong> (human DNA load). It provides two complementary models validated on 154 samples across six clinical specimen types.
     </p>
   </div>
 
@@ -1212,26 +1212,59 @@ or: sample_id, delta_ct"></textarea>
   <!-- The Science -->
   <div class="guide-section">
     <div class="guide-section-label">The Science</div>
-    <h2>How does the ΔCt model work?</h2>
+    <h2>From ΔCt to microbial fraction</h2>
     <p>
-      The assay measures two qPCR targets on the same DNA extract: the <strong>16S rRNA gene</strong> (universal bacterial marker) and <strong>ACTB</strong> (human housekeeping gene). Their difference defines the delta Ct:
+      The key predictor is the difference in Ct values between the two targets:
     </p>
     <div class="guide-code">
       <span class="c-teal">ΔCt</span> = Ct<span class="c-yellow">_ACTB</span> − Ct<span class="c-yellow">_16S</span>
     </div>
     <p style="margin-top:14px">
-      A <strong>high ΔCt</strong> means ACTB amplifies late (little host) and 16S amplifies early (lots of bacteria) — the sample is highly microbial. A <strong>low or negative ΔCt</strong> indicates host-dominated DNA.
+      A <strong>high ΔCt</strong> means late ACTB amplification (little host) relative to early 16S (abundant bacteria) — a high microbial fraction. A <strong>low or negative ΔCt</strong> indicates host-dominated DNA.
     </p>
     <p>
-      Cho et al. fitted a four-parameter sigmoid curve to 75 clinical samples across a wide range of microbial fractions, achieving R²=0.990. The fitted equation is:
+      Cho et al. (2021) showed that this relationship follows a four-parameter sigmoid across stool and oropharyngeal samples (R²=0.990, n=75). However, this model has a structural limitation: a lower asymptote at ~0.027% prevents it from resolving samples below ~4% microbial reads — precisely the range where <strong>BAL and other low-biomass respiratory specimens</strong> cluster.
     </p>
-    <div class="guide-code">
-      <span class="c-teal">% microbial</span> = <span class="c-white">2.7201549</span> /
-      <span class="c-muted"> (</span><span class="c-white">99.50267</span> × e<span class="c-white">^(−0.7218 × ΔCt)</span> + <span class="c-white">0.02733</span><span class="c-muted">)</span>
-    </div>
     <div class="guide-callout">
-      <strong>Valid range:</strong> The model is validated for samples between 4% and 98% microbial reads. Predictions outside this range are flagged but still shown — treat them with caution and consider them indicative only.
+      <strong>Why Cho fails in the low-ΔCt zone:</strong> The sigmoid's lower asymptote creates a compressed tail. Samples with 0.1–4% microbial reads map to nearly identical ΔCt values, making discrimination impossible without an additional signal. Bootstrap LOOCV on 154 samples confirms RMSE ≈ 12% for Cho in the &lt;4% regime.
     </div>
+  </div>
+
+  <hr class="guide-divider">
+
+  <!-- Models -->
+  <div class="guide-section">
+    <div class="guide-section-label">Models</div>
+    <h2>Two prediction models</h2>
+    <div class="guide-grid">
+      <div class="guide-card">
+        <h3>Cho Model E — sigmoid</h3>
+        <p>The original Cho et al. (2021) four-parameter sigmoid. Fast, requires only ΔCt. Best for samples in the 4–98% range where the sigmoid is well-calibrated.</p>
+        <div class="guide-code" style="margin-top:12px;font-size:10.5px">
+<span class="c-teal">% microbial</span> =<br>
+<span class="c-white">&nbsp; 2.7201549 /</span><br>
+<span class="c-muted">&nbsp; (99.50267 × e^(−0.7218×ΔCt) + 0.02733)</span><br><br>
+<span class="c-muted">Valid range: 4% – 98%</span><br>
+<span class="c-muted">95% CI: bootstrap residuals</span>
+        </div>
+      </div>
+      <div class="guide-card">
+        <h3>GPR — site-aware</h3>
+        <p>Gaussian Process Regression with a Matérn ν=1.5 kernel trained on 154 samples across six specimen types. Uses Ct_ACTB, Ct_16S, ΔCt, and a site one-hot encoding as features.</p>
+        <div class="guide-code" style="margin-top:12px;font-size:10.5px">
+<span class="c-teal">μ</span> = <span class="c-white">GPR(ct_ACTB, ct_16S, ΔCt, site)</span><br>
+<span class="c-teal">% microbial</span> = <span class="c-white">100 / (1 + e^−μ)</span><br><br>
+<span class="c-muted">RMSE &lt;4% zone: ~2.4% vs Cho ~12%</span><br>
+<span class="c-muted">95% CI: inv-logit(μ ± 1.96σ)</span>
+        </div>
+      </div>
+    </div>
+    <div class="guide-callout" style="margin-top:16px">
+      <strong>Which model to use?</strong> Use <strong>GPR</strong> when you know the specimen type (always available in clinical workflows) and especially for low-biomass samples (BAL, sputum). Use <strong>Cho</strong> for a quick estimate when only ΔCt is available or when samples are in the 4–98% range.
+    </div>
+    <p style="margin-top:16px">
+      Model performance was evaluated by leave-one-out cross-validation (LOOCV) with 1000-iteration bootstrap resampling of the (y_true, y_pred) pairs to obtain RMSE confidence intervals. Six models were benchmarked; GPR with site OHE showed the largest improvement over baseline in the clinically critical &lt;4% microbial zone (ΔRMSE = −7.8 percentage points vs Cho, p&lt;10⁻³¹).
+    </p>
   </div>
 
   <hr class="guide-divider">
@@ -1245,35 +1278,35 @@ or: sample_id, delta_ct"></textarea>
         <div class="guide-step-num">1</div>
         <div class="guide-step-body">
           <h4>Run the dual-target qPCR</h4>
-          <p>Amplify <strong>16S rRNA</strong> and <strong>ACTB</strong> from your DNA extract using standard qPCR conditions. Record the Ct values for each sample.</p>
+          <p>Amplify <strong>16S rRNA</strong> and <strong>ACTB</strong> from your DNA extract. Record Ct_ACTB and Ct_16S for each sample. For the Cho model only ΔCt is needed; the GPR model uses both values separately.</p>
         </div>
       </div>
       <div class="guide-step">
         <div class="guide-step-num">2</div>
         <div class="guide-step-body">
-          <h4>Calculate ΔCt (or let CTomics do it)</h4>
-          <p>Compute ΔCt = Ct_ACTB − Ct_16S per sample. Alternatively, provide raw Ct values in CSV mode and CTomics will calculate it automatically.</p>
+          <h4>Choose a model</h4>
+          <p>Select <strong>Cho</strong> (default, ΔCt only) or <strong>GPR</strong> (site-aware, requires Ct_ACTB + Ct_16S + specimen type). The GPR model loads instantly — no internet connection required beyond the initial page load.</p>
         </div>
       </div>
       <div class="guide-step">
         <div class="guide-step-num">3</div>
         <div class="guide-step-body">
           <h4>Enter your data</h4>
-          <p>Use <strong>Manual</strong> mode for a quick paste, <strong>CSV / Paste</strong> to provide a full table, or <strong>Upload</strong> to load a file directly from disk.</p>
+          <p>Use <strong>Manual</strong> mode for a quick paste or <strong>CSV / Paste</strong> for a full table. For GPR, the manual format expects <code style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent)">id  ct_actb  ct_16s</code>; select the specimen type from the dropdown.</p>
         </div>
       </div>
       <div class="guide-step">
         <div class="guide-step-num">4</div>
         <div class="guide-step-body">
           <h4>Set sequencing parameters</h4>
-          <p>Enter your target microbial read depth (M reads) and total sequencing capacity. CTomics will tell you how much sequencing you need per sample.</p>
+          <p>Enter your target microbial read depth (M reads) and total sequencing capacity. CTomics computes how much depth each sample needs to reach your target.</p>
         </div>
       </div>
       <div class="guide-step">
         <div class="guide-step-num">5</div>
         <div class="guide-step-body">
-          <h4>Click Run Predictions and export</h4>
-          <p>Review results in the table and chart. Download a CSV with all predictions and confidence intervals for your records.</p>
+          <h4>Review and export</h4>
+          <p>Results appear in the table and chart. Download a CSV with all predictions, confidence intervals, and σ (GPR mode) for your records.</p>
         </div>
       </div>
     </div>
@@ -1287,8 +1320,8 @@ or: sample_id, delta_ct"></textarea>
     <h2>How to format your data</h2>
     <div class="guide-grid">
       <div class="guide-card">
-        <h3>Manual — ΔCt values</h3>
-        <p>One sample per line. Provide an optional ID followed by the ΔCt value, or just raw values.</p>
+        <h3>Cho — manual</h3>
+        <p>One sample per line: optional ID then ΔCt, or just raw ΔCt values.</p>
         <div class="guide-code" style="margin-top:10px">
 <span class="c-muted">sample_id &nbsp; delta_ct</span>
 <span class="c-white">AH-PS-001 &nbsp; 7.73</span>
@@ -1297,18 +1330,18 @@ or: sample_id, delta_ct"></textarea>
         </div>
       </div>
       <div class="guide-card">
-        <h3>CSV — Raw Ct values</h3>
-        <p>Provide individual Ct values; CTomics computes ΔCt automatically from <code style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent)">ct_actb</code> and <code style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent)">ct_16s</code>.</p>
+        <h3>GPR — manual</h3>
+        <p>One sample per line: ID then Ct_ACTB then Ct_16S. Select specimen type from the site dropdown.</p>
         <div class="guide-code" style="margin-top:10px">
-<span class="c-muted">sample_id,ct_actb,ct_16s</span>
-<span class="c-white">AH-PS-001,24.881,17.150</span>
-<span class="c-white">HSV-11,29.487,15.288</span>
-<span class="c-white">S01,37.520,17.340</span>
+<span class="c-muted">sample_id &nbsp; ct_actb &nbsp; ct_16s</span>
+<span class="c-white">AH-PS-001 &nbsp; 24.881 &nbsp;&nbsp; 17.150</span>
+<span class="c-white">BAL-042 &nbsp;&nbsp;&nbsp; 17.880 &nbsp;&nbsp; 16.660</span>
+<span class="c-white">BAL-007 &nbsp;&nbsp;&nbsp; 18.500 &nbsp;&nbsp; 15.650</span>
         </div>
       </div>
     </div>
     <div class="guide-callout" style="margin-top:16px">
-      <strong>Accepted CSV columns:</strong> <code style="font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:11px">sample_id</code>, <code style="font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:11px">ct_actb</code>, <code style="font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:11px">ct_16s</code> — or — <code style="font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:11px">sample_id</code>, <code style="font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:11px">delta_ct</code>. Column names are case-insensitive. TSV and space-delimited files are also accepted.
+      <strong>CSV / Upload (both models):</strong> Include columns <code style="font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:11px">ct_actb</code> and <code style="font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:11px">ct_16s</code> — CTomics computes ΔCt automatically and uses both values for GPR. Adding a <code style="font-family:'JetBrains Mono',monospace;color:var(--accent);font-size:11px">sample_type</code> column overrides the site dropdown per sample. Column names are case-insensitive; TSV and space-delimited files also accepted.
     </div>
   </div>
 
@@ -1322,27 +1355,59 @@ or: sample_id, delta_ct"></textarea>
     <div class="regime-row">
       <div class="regime-item">
         <span class="regime-pill" style="color:var(--success);background:rgba(5,150,105,0.08);">VALID</span>
-        <p><strong>4–98% microbial.</strong> Within the model's validated range. Predictions are reliable. Use the 95% CI to assess uncertainty.</p>
+        <p><strong>4–98% microbial.</strong> Within the Cho model's validated range. Both models perform well here. Use the 95% CI to assess uncertainty.</p>
       </div>
       <div class="regime-item">
         <span class="regime-pill" style="color:var(--danger);background:rgba(225,29,72,0.08);">LOW-ΔCt</span>
-        <p><strong>&lt;4% microbial.</strong> Host-dominated sample. The model approaches its lower asymptote. Predictions are indicative — actual microbial fraction may be even lower. Consider host depletion before sequencing.</p>
+        <p><strong>&lt;4% microbial.</strong> Host-dominated sample — the clinically critical zone for BAL and low-biomass specimens. The Cho sigmoid is unreliable here; the <strong>GPR model is recommended</strong> (RMSE ~2.4% vs ~12% for Cho). Consider host depletion before sequencing.</p>
       </div>
       <div class="regime-item">
         <span class="regime-pill" style="color:var(--purple);background:rgba(124,58,237,0.08);">SATURATED</span>
-        <p><strong>&gt;98% microbial.</strong> Near-pure microbial sample. The sigmoid approaches saturation. Prediction is a lower bound — true fraction is likely at or above 98%.</p>
+        <p><strong>&gt;98% microbial.</strong> Near-pure microbial sample. Both models approach saturation; prediction is a lower bound.</p>
       </div>
     </div>
     <div class="guide-grid" style="margin-top:20px">
       <div class="guide-card">
+        <h3>95% CI — Cho</h3>
+        <p>Bootstrap confidence interval from resampling model residuals (symmetric in % space). Width reflects empirical prediction variance across the training set.</p>
+      </div>
+      <div class="guide-card">
+        <h3>95% CI — GPR (σ)</h3>
+        <p>Calibrated posterior uncertainty from the GP kernel. Asymmetric because it is computed as inv-logit(μ ± 1.96σ). σ in logit units is also reported separately.</p>
+      </div>
+      <div class="guide-card">
         <h3>At N M reads → microbial</h3>
-        <p>How many microbial reads you would obtain if you sequence to your specified total depth. Computed as: <br><code style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent)">total_depth × (pred% / 100)</code></p>
+        <p>Microbial reads you would obtain at the specified total depth: <code style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent)">total_depth × (pred% / 100)</code></p>
       </div>
       <div class="guide-card">
         <h3>To reach target → need</h3>
-        <p>Total sequencing depth required to yield your target number of microbial reads. Computed as: <br><code style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent)">target_reads / (pred% / 100)</code></p>
+        <p>Total depth required to yield your target microbial reads: <code style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent)">target_reads / (pred% / 100)</code></p>
       </div>
     </div>
+  </div>
+
+  <hr class="guide-divider">
+
+  <!-- Data & Training -->
+  <div class="guide-section">
+    <div class="guide-section-label">Training Data</div>
+    <h2>Dataset and validation</h2>
+    <p>
+      The GPR model was trained on <strong>154 samples</strong> spanning six specimen types, combining the original Cho et al. cohort with matched qPCR + sequencing data from the <strong>REPAIR cohort</strong> (BAL samples from patients with rheumatoid arthritis-associated ILD) and an independent set of lung sputum samples.
+    </p>
+    <div class="guide-grid">
+      <div class="guide-card">
+        <h3>Specimen types</h3>
+        <p>Lung BAL · Oropharyngeal · Stool · Rectal swab · Vaginal sample · Lung sputum</p>
+      </div>
+      <div class="guide-card">
+        <h3>ΔCt range</h3>
+        <p>−3.45 to +26.4 · Microbial fraction 0.06–99.5% · 73/154 samples &lt;4% microbial</p>
+      </div>
+    </div>
+    <p style="margin-top:16px">
+      Model selection used leave-one-out cross-validation (LOOCV) with 1000-iteration bootstrap resampling. Six models were evaluated (Cho sigmoid, Beta regression, LASSO, Ridge, XGBoost, GPR). The GPR with site one-hot encoding achieved RMSE 4.47% overall and 2.43% in the &lt;4% zone, with the improvement over Cho statistically significant at every tested threshold (Bonferroni-corrected p &lt; 0.01).
+    </p>
   </div>
 
   <hr class="guide-divider">
@@ -1350,13 +1415,20 @@ or: sample_id, delta_ct"></textarea>
   <!-- Citation -->
   <div class="guide-section">
     <div class="guide-section-label">Citation</div>
-    <h2>Reference</h2>
-    <p>If you use CTomics in your research, please cite the original model publication:</p>
+    <h2>References</h2>
+    <p>If you use CTomics in your research, please cite the original sigmoid model:</p>
     <div class="guide-citation">
       <p>
-        <span class="cite-title">Cho, I. et al. (2021). Quantitative prediction of the microbial composition of metagenomic samples from a targeted PCR assay for metagenomics.</span><br>
-        <span class="cite-journal">mSystems</span>, 6(3), e00552-21.<br>
+        <span class="cite-title">Cho, M.Y. et al. (2021). Two-Target Quantitative PCR To Predict Library Composition for Shallow Shotgun Sequencing.</span><br>
+        <span class="cite-journal">mSystems</span>, 6(4), e00552-21.<br>
         <span style="color:var(--text-muted)">doi: 10.1128/mSystems.00552-21</span>
+      </p>
+    </div>
+    <p style="margin-top:16px">The REPAIR cohort data and GPR model extension are described in:</p>
+    <div class="guide-citation">
+      <p>
+        <span class="cite-title">Velo Suárez, L. et al. CTomics: site-aware Gaussian Process prediction of metagenomic microbial fraction from dual-target qPCR.</span><br>
+        <span style="color:var(--text-muted)">Manuscript in preparation · Source: github.com/lvelosuarez/CTomics</span>
       </p>
     </div>
   </div>
